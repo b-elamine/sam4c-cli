@@ -1,0 +1,71 @@
+name: clinic-portal
+
+components:
+  - name: FrontendVM
+    type: VM
+    attributes:
+      Domain: frontend
+    children:
+      - name: Nginx
+        type: App
+        attributes:
+          Domain: frontend
+        ports: [http_in, api_out]
+
+  - name: BackendVM
+    type: VM
+    attributes:
+      Domain: backend
+    children:
+      - name: SpringAPI
+        type: App
+        attributes:
+          Domain: backend
+        ports: [api_in, db_out, admin_in]
+
+  - name: DatabaseVM
+    type: VM
+    attributes:
+      Domain: database
+    children:
+      - name: PatientDB
+        type: Data
+        attributes:
+          Domain: database
+          DataClass: clinical
+        ports: [db_in]
+
+  - name: AdminVM
+    type: VM
+    attributes:
+      Domain: admin
+    children:
+      - name: AdminDashboard
+        type: App
+        attributes:
+          Domain: admin
+          Role: administrator
+        ports: [mgmt_out]
+
+connectors:
+  - name: FE_to_BE
+  - name: BE_to_DB
+  - name: Admin_to_BE
+  - name: Internet
+    external: true
+
+links:
+  - port: Nginx.http_in
+    connector: Internet
+  - port: Nginx.api_out
+    connector: FE_to_BE
+  - port: SpringAPI.api_in
+    connector: FE_to_BE
+  - port: SpringAPI.db_out
+    connector: BE_to_DB
+  - port: PatientDB.db_in
+    connector: BE_to_DB
+  - port: AdminDashboard.mgmt_out
+    connector: Admin_to_BE
+  - port: SpringAPI.admin_in
+    connector: Admin_to_BE

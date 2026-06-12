@@ -1,0 +1,25 @@
+#attribute Domain = (frontend, backend, database, admin);
+#attribute Role = (patient, clinician, administrator);
+#attribute DataClass = (pii, clinical, audit);
+
+#context frontendCtx = (Domain=frontend);
+#context backendCtx = (Domain=backend);
+#context dbCtx = (Domain=database);
+#context adminCtx = (Domain=admin);
+#context adminRoleCtx = (Role=administrator);
+#context clinicalDataCtx = (DataClass=clinical);
+#context piiCtx = (DataClass=pii);
+
+#property Confidentiality(dbCtx, backendCtx);
+
+#property Integrity(backendCtx, dbCtx);
+
+#property Authentication(adminRoleCtx, adminCtx) -> backendCtx;
+
+#property Isolation(dbCtx, frontendCtx);
+
+#property Isolation(adminCtx, frontendCtx);
+
+#property Confidentiality(clinicalDataCtx, backendCtx);
+
+#property Confidentiality(piiCtx, backendCtx);

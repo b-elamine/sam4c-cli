@@ -1,0 +1,284 @@
+{
+  "architecture" : {
+    "name" : "clinic-portal",
+    "components" : [ {
+      "name" : "FrontendVM",
+      "type" : "VM",
+      "ports" : [ ],
+      "children" : [ {
+        "name" : "Nginx",
+        "type" : "App",
+        "ports" : [ {
+          "name" : "http_in"
+        }, {
+          "name" : "api_out"
+        } ],
+        "children" : [ ],
+        "external" : false,
+        "attributes" : {
+          "Domain" : "frontend"
+        },
+        "properties" : { }
+      } ],
+      "external" : false,
+      "attributes" : {
+        "Domain" : "frontend"
+      },
+      "properties" : { }
+    }, {
+      "name" : "BackendVM",
+      "type" : "VM",
+      "ports" : [ ],
+      "children" : [ {
+        "name" : "SpringAPI",
+        "type" : "App",
+        "ports" : [ {
+          "name" : "api_in"
+        }, {
+          "name" : "db_out"
+        }, {
+          "name" : "admin_in"
+        } ],
+        "children" : [ ],
+        "external" : false,
+        "attributes" : {
+          "Domain" : "backend"
+        },
+        "properties" : { }
+      } ],
+      "external" : false,
+      "attributes" : {
+        "Domain" : "backend"
+      },
+      "properties" : { }
+    }, {
+      "name" : "DatabaseVM",
+      "type" : "VM",
+      "ports" : [ ],
+      "children" : [ {
+        "name" : "PatientDB",
+        "type" : "Data",
+        "ports" : [ {
+          "name" : "db_in"
+        } ],
+        "children" : [ ],
+        "external" : false,
+        "attributes" : {
+          "Domain" : "database",
+          "DataClass" : "clinical"
+        },
+        "properties" : { }
+      } ],
+      "external" : false,
+      "attributes" : {
+        "Domain" : "database"
+      },
+      "properties" : { }
+    }, {
+      "name" : "AdminVM",
+      "type" : "VM",
+      "ports" : [ ],
+      "children" : [ {
+        "name" : "AdminDashboard",
+        "type" : "App",
+        "ports" : [ {
+          "name" : "mgmt_out"
+        } ],
+        "children" : [ ],
+        "external" : false,
+        "attributes" : {
+          "Domain" : "admin",
+          "Role" : "administrator"
+        },
+        "properties" : { }
+      } ],
+      "external" : false,
+      "attributes" : {
+        "Domain" : "admin"
+      },
+      "properties" : { }
+    } ],
+    "connectors" : [ {
+      "name" : "FE_to_BE",
+      "external" : false
+    }, {
+      "name" : "BE_to_DB",
+      "external" : false
+    }, {
+      "name" : "Admin_to_BE",
+      "external" : false
+    }, {
+      "name" : "Internet",
+      "external" : true
+    } ],
+    "links" : [ {
+      "portRef" : "Nginx.http_in",
+      "connectorName" : "Internet"
+    }, {
+      "portRef" : "Nginx.api_out",
+      "connectorName" : "FE_to_BE"
+    }, {
+      "portRef" : "SpringAPI.api_in",
+      "connectorName" : "FE_to_BE"
+    }, {
+      "portRef" : "SpringAPI.db_out",
+      "connectorName" : "BE_to_DB"
+    }, {
+      "portRef" : "PatientDB.db_in",
+      "connectorName" : "BE_to_DB"
+    }, {
+      "portRef" : "AdminDashboard.mgmt_out",
+      "connectorName" : "Admin_to_BE"
+    }, {
+      "portRef" : "SpringAPI.admin_in",
+      "connectorName" : "Admin_to_BE"
+    } ]
+  },
+  "security" : {
+    "attributes" : [ {
+      "name" : "Domain",
+      "values" : [ "frontend", "backend", "database", "admin" ]
+    }, {
+      "name" : "Role",
+      "values" : [ "patient", "clinician", "administrator" ]
+    }, {
+      "name" : "DataClass",
+      "values" : [ "pii", "clinical", "audit" ]
+    } ],
+    "contexts" : [ {
+      "name" : "frontendCtx",
+      "conditions" : [ {
+        "attribute" : "Domain",
+        "value" : "frontend"
+      } ]
+    }, {
+      "name" : "backendCtx",
+      "conditions" : [ {
+        "attribute" : "Domain",
+        "value" : "backend"
+      } ]
+    }, {
+      "name" : "dbCtx",
+      "conditions" : [ {
+        "attribute" : "Domain",
+        "value" : "database"
+      } ]
+    }, {
+      "name" : "adminCtx",
+      "conditions" : [ {
+        "attribute" : "Domain",
+        "value" : "admin"
+      } ]
+    }, {
+      "name" : "adminRoleCtx",
+      "conditions" : [ {
+        "attribute" : "Role",
+        "value" : "administrator"
+      } ]
+    }, {
+      "name" : "clinicalDataCtx",
+      "conditions" : [ {
+        "attribute" : "DataClass",
+        "value" : "clinical"
+      } ]
+    }, {
+      "name" : "piiCtx",
+      "conditions" : [ {
+        "attribute" : "DataClass",
+        "value" : "pii"
+      } ]
+    } ],
+    "rules" : [ {
+      "sctx" : {
+        "name" : "dbCtx"
+      },
+      "tctx" : {
+        "name" : "backendCtx"
+      }
+    }, {
+      "sctx" : {
+        "name" : "backendCtx"
+      },
+      "tctx" : {
+        "name" : "dbCtx"
+      }
+    }, {
+      "sctx" : {
+        "name" : "adminRoleCtx"
+      },
+      "actx" : {
+        "name" : "adminCtx"
+      },
+      "tctx" : {
+        "name" : "backendCtx"
+      }
+    }, {
+      "sctx" : {
+        "name" : "dbCtx"
+      },
+      "tctx" : {
+        "name" : "frontendCtx"
+      }
+    }, {
+      "sctx" : {
+        "name" : "adminCtx"
+      },
+      "tctx" : {
+        "name" : "frontendCtx"
+      }
+    }, {
+      "sctx" : {
+        "name" : "clinicalDataCtx"
+      },
+      "tctx" : {
+        "name" : "backendCtx"
+      }
+    }, {
+      "sctx" : {
+        "name" : "piiCtx"
+      },
+      "tctx" : {
+        "name" : "backendCtx"
+      }
+    } ]
+  },
+  "coverage" : {
+    "frontendCtx" : [ "FrontendVM", "Nginx" ],
+    "backendCtx" : [ "BackendVM", "SpringAPI" ],
+    "dbCtx" : [ "DatabaseVM", "PatientDB" ],
+    "adminCtx" : [ "AdminVM", "AdminDashboard" ],
+    "adminRoleCtx" : [ "AdminDashboard" ],
+    "clinicalDataCtx" : [ "PatientDB" ],
+    "piiCtx" : [ ]
+  },
+  "resolvedRules" : [ {
+    "type" : "Confidentiality",
+    "sctx" : [ "DatabaseVM", "PatientDB" ],
+    "tctx" : [ "BackendVM", "SpringAPI" ]
+  }, {
+    "type" : "Integrity",
+    "sctx" : [ "BackendVM", "SpringAPI" ],
+    "tctx" : [ "DatabaseVM", "PatientDB" ]
+  }, {
+    "type" : "Authentication",
+    "sctx" : [ "AdminDashboard" ],
+    "tctx" : [ "BackendVM", "SpringAPI" ],
+    "actx" : [ "AdminVM", "AdminDashboard" ]
+  }, {
+    "type" : "Isolation",
+    "sctx" : [ "DatabaseVM", "PatientDB" ],
+    "tctx" : [ "FrontendVM", "Nginx" ]
+  }, {
+    "type" : "Isolation",
+    "sctx" : [ "AdminVM", "AdminDashboard" ],
+    "tctx" : [ "FrontendVM", "Nginx" ]
+  }, {
+    "type" : "Confidentiality",
+    "sctx" : [ "PatientDB" ],
+    "tctx" : [ "BackendVM", "SpringAPI" ]
+  }, {
+    "type" : "Confidentiality",
+    "sctx" : [ ],
+    "tctx" : [ "BackendVM", "SpringAPI" ]
+  } ]
+}
