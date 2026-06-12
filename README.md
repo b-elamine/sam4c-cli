@@ -1,5 +1,16 @@
 # s4cLight
 
+A command-line tool for modelling cloud application architectures and their security requirements, then merging them into a single unified model you can feed into a generator.
+
+
+**1. Your architecture** - what VMs, services, and data stores you have, how they connect, and what security attributes each component carries.
+
+**2. Your security rules** - what confidentiality, integrity, isolation, and authentication requirements apply between parts of the system.
+
+The tool merges them. After the merge, every security rule directly points to the actual architecture components it governs.
+
+---
+
 ## Quick start
 
 Build:
@@ -70,9 +81,7 @@ links:
     connector: API_to_DB
 ```
 
-
-
-### The security rules file (.secdsl)
+The security rules file (.secdsl)
 
 ```
 #attribute Domain = (backend, database, frontend);
@@ -85,27 +94,11 @@ links:
 #property Isolation(dbCtx, (Domain=frontend));
 ```
 
-property types:
-
-| Property | Syntax | Meaning |
-|---|---|---|
-| Confidentiality | `Confidentiality(sctx, tctx?)` | Communication must be encrypted |
-| Integrity | `Integrity(sctx, tctx?)` | Data must not be alterable in transit |
-| Isolation | `Isolation(sctx, tctx?)` | No network path allowed between the two sides |
-| Authentication | `Authentication(sctx, actx) -> tctx` | sctx must authenticate via actx before reaching tctx |
-
----
-
-## Output
+**Output**
 
 A `.sam4c.json` file with four sections:
 
-- `architecture` -- the full component tree as loaded
-- `security` -- attributes, contexts, rules as parsed
-- `coverage` -- for each named context, which component names it matched
-- `resolvedRules` -- each rule with the component names it governs
-
-The in-memory model (before JSON serialization) has real Java object references -- `rule.sctxComponents()`A generator reading the model navigates it like a proper object graph.
-
----
-
+- `architecture` -- the full component tree as loaded from YAML
+- `security` -- attributes, contexts, and rules as parsed from the DSL (with type names)
+- `coverage` -- for each named context, the full component objects that matched its predicate
+- `resolvedRules` -- each rule with the full component objects for sctx, tctx, and actx embedded inline

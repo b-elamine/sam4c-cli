@@ -39,11 +39,8 @@ alias s4c="java -jar ~/bin/s4clight.jar"
 ## 2. CLI reference
 
 ```
-s4clight [--metamodel] <arch-file> <rules-file> [options]
-```
-
-```
 s4clight <arch-file> <rules-file> [options]
+s4clight --metamodel
 ```
 
 ### Arguments
@@ -103,13 +100,6 @@ Checking conformance against M2 metamodel...
   Conformance OK
 Merging and resolving cross-references...
 
--- Resolution report --
-  dbCtx                          -> context
-  backendCtx                     -> context
-  adminRoleCtx                   -> context
-  adminCtx                       -> context
-  frontendCtx                    -> context
-
 -- Architecture --
   Name       : clinic-portal
   Components : 4
@@ -121,10 +111,21 @@ Merging and resolving cross-references...
   Contexts   : 7
   Rules      : 7
 
+-- Coverage (context -> matched components) --
+  frontendCtx               -> [FrontendVM, Nginx]
+  backendCtx                -> [BackendVM, SpringAPI]
+  dbCtx                     -> [DatabaseVM, PatientDB]
+
+-- Resolved rules --
+  Confidentiality      sctx=[DatabaseVM, PatientDB]
+                       tctx=[BackendVM, SpringAPI]
+  Isolation            sctx=[DatabaseVM, PatientDB]
+                       tctx=[FrontendVM, Nginx]
+
 Wrote unified model to: clinic.sam4c.json
 ```
 
-If a name in a security rule cannot be resolved, it appears under "Unresolved" with an `x` marker and the tool exits with code 1.
+If any context name or reference in the security rules cannot be resolved, it appears under "Unresolved" and the tool exits with code 1.
 
 ---
 
@@ -298,30 +299,48 @@ name: clinic-portal
 components:
   - name: FrontendVM
     type: VM
+    attributes:
+      Domain: frontend
     children:
       - name: Nginx
         type: App
+        attributes:
+          Domain: frontend
         ports: [http_in, api_out]
 
   - name: BackendVM
     type: VM
+    attributes:
+      Domain: backend
     children:
       - name: SpringAPI
         type: App
+        attributes:
+          Domain: backend
         ports: [api_in, db_out, admin_in]
 
   - name: DatabaseVM
     type: VM
+    attributes:
+      Domain: database
     children:
       - name: PatientDB
         type: Data
+        attributes:
+          Domain: database
+          DataClass: clinical
         ports: [db_in]
 
   - name: AdminVM
     type: VM
+    attributes:
+      Domain: admin
     children:
       - name: AdminDashboard
         type: App
+        attributes:
+          Domain: admin
+          Role: administrator
         ports: [mgmt_out]
 
 connectors:
@@ -571,68 +590,74 @@ Lines starting with `//` are ignored:
 
 ## 5. Understanding the output
 
-The output is a JSON file named `<arch-name>.sam4c.json`. It contains four sections.
+The output is a JSON file named `<arch-name>.sam4c.json`. It has five top-level fields.
+
+### name
+
+The architecture name from the YAML file.
 
 ### architecture
 
-The full architecture as loaded from the YAML file. Nested structure is preserved. Each port appears as an object `{ "name": "http_in" }`.
+The full architecture as loaded from the YAML file. Hierarchical structure is preserved -- VMs contain their child Apps and Data stores. Each port appears as `{ "name": "http_in" }`.
 
 ### security
 
-The security model as parsed from the `.secdsl` file.
-
-Each rule is serialised with a `@type` discriminator matching the property name:
+The security model as parsed from the `.secdsl` file. Each rule has a `type` field:
 
 ```json
 {
-  "@type": "Confidentiality",
-  "sctx": { "@type": "NamedRef", "name": "dbCtx" },
-  "tctx": { "@type": "NamedRef", "name": "backendCtx" }
+  "type": "Confidentiality",
+  "sctx": { "name": "dbCtx" },
+  "tctx": { "name": "backendCtx" }
 }
 ```
 
-Reference types:
+This section shows the rules as written -- using context names, not resolved components. It is the "intent" layer.
 
-| JSON `@type` | Meaning |
-|---|---|
-| `NamedRef` | A name that was resolved against contexts or architecture elements |
-| `ValuedAttrRef` | An inline condition `(attribute=value)` |
-| `ComposedRef` | A conjunction of conditions |
+### coverage
 
-### resolution
-
-A map of every name that appeared in the security rules and what it resolved to:
+For each named context, the full component objects that matched its predicate. Components are embedded inline with all their data:
 
 ```json
-"resolution": {
-  "dbCtx":      "context",
-  "backendCtx": "context",
-  "Nginx":      "component:App",
-  "FE_to_BE":   "connector"
+"coverage": {
+  "dbCtx": [
+    { "name": "DatabaseVM", "type": "VM",   "attributes": { "Domain": "database" }, "children": ["PatientDB"] },
+    { "name": "PatientDB",  "type": "Data", "attributes": { "Domain": "database", "DataClass": "clinical" }, "ports": ["db_in"] }
+  ]
 }
 ```
 
-Possible resolution values:
+A context with no matching components appears as an empty array. This is useful feedback: it means you wrote a security rule that applies to nothing in your architecture.
 
-| Value | Meaning |
-|---|---|
-| `context` | Resolved to a named context declared in the `.secdsl` file |
-| `attribute` | Resolved to a declared attribute type |
-| `component:VM` | Resolved to a VM component in the architecture |
-| `component:App` | Resolved to an App component in the architecture |
-| `component:Data` | Resolved to a Data component in the architecture |
-| `connector` | Resolved to a connector in the architecture |
-| `port` | Resolved to a port |
+### resolvedRules
 
-### unresolved
+Each security rule with the full component objects for every side embedded inline. This is the generator-ready section -- a generator reading only this section has everything it needs:
 
-A list of names that appeared in the security rules but could not be resolved to anything in either the security model or the architecture:
+```json
+{
+  "type": "Isolation",
+  "sctx": [
+    { "name": "DatabaseVM", "type": "VM",   "attributes": { "Domain": "database" }, "children": ["PatientDB"] },
+    { "name": "PatientDB",  "type": "Data", "attributes": { "Domain": "database", "DataClass": "clinical" }, "ports": ["db_in"] }
+  ],
+  "tctx": [
+    { "name": "FrontendVM", "type": "VM",  "attributes": { "Domain": "frontend" }, "children": ["Nginx"] },
+    { "name": "Nginx",      "type": "App", "attributes": { "Domain": "frontend" }, "ports": ["http_in", "api_out"] }
+  ]
+}
+```
+
+A generator iterates `resolvedRules`, reads the rule `type`, then accesses `sctx`, `tctx`, and `actx` directly. No lookup into the `architecture` section required.
+
+### unresolved (only if non-empty)
+
+A list of names that appeared in the security rules but could not be matched to any named context or architecture element:
 
 ```json
 "unresolved": ["typoCtx", "UnknownVM"]
 ```
 
-An empty list means the model is fully resolved. A non-empty list is a warning -- the tool still writes the output, but the exit code is 1.
+When this field appears, the tool exits with code 1. Fix the names in the `.secdsl` file or add the missing components to the `.arch.yaml` file.
 
 ---
 
@@ -668,10 +693,20 @@ propReg.register(new RuleFactory() {
 });
 ```
 
-**Step 4.** Add a case to the `collectRefs` switch in `ModelMerger.java`:
+**Step 4.** Add a case to `resolveRule()` in `ModelMerger.java` and to `checkRule()` in `ConformanceChecker.java`:
 
 ```java
-case NonRepudiation r -> addRef(refs, r.sctx());
+// ModelMerger.java -- resolveRule()
+case NonRepudiation r -> new ResolvedRule(rule,
+    resolveRef(r.sctx(), coverage, all, unresolved),
+    List.of(), List.of());
+
+// ConformanceChecker.java -- checkRule()
+case NonRepudiation r -> {
+    if (r.sctx() == null)
+        errors.add("NonRepudiation: sctx is required");
+    else errors.addAll(checkRef(r.sctx(), "NonRepudiation.sctx"));
+}
 ```
 
 **Step 5.** Use it in any `.secdsl` file:
@@ -697,6 +732,7 @@ compReg.register(new ComponentTypeHandler() {
                 ComponentRegistry.loadPorts(yaml),
                 List.of(),
                 ComponentRegistry.bool(yaml, "external"),
+                ComponentRegistry.loadAttributes(yaml),
                 Map.of("image", image, "replicas", replicas)
         );
     }
