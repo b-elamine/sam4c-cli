@@ -1,25 +1,5 @@
 # s4cLight
 
-A command-line tool for modelling cloud application architectures and their security requirements, then merging them into a single unified model you can feed into a generator.
-
-No Eclipse. No IDE. Just a JAR and two text files.
-
----
-
-## What it does
-
-You describe two things:
-
-**1. Your architecture** -- what VMs, services, and data stores you have, how they connect, and what security attributes each component carries.
-
-**2. Your security rules** -- what confidentiality, integrity, isolation, and authentication requirements apply between parts of the system.
-
-The tool merges them. After the merge, every security rule directly points to the actual architecture components it governs. You get a unified model where a "Confidentiality between database and backend" rule knows it is talking about `PatientDB` and `SpringAPI` specifically -- their types, ports, attributes, everything.
-
-That unified model is the handoff point to a generator that would produce Terraform, Kubernetes manifests, Docker Compose, etc. The generator is not built yet -- that is the next phase.
-
----
-
 ## Quick start
 
 Build:
