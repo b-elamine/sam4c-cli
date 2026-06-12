@@ -20,22 +20,22 @@ mvn package -q
 
 Run on the included example:
 ```bash
-java -jar target/s4clight.jar examples/clinic.arch.yaml examples/clinic.secdsl
+java -jar target/sam4c-cli.jar examples/clinic.arch.yaml examples/clinic.secdsl
 ```
 
 See the full object graph (what each rule actually points to):
 ```bash
-java -jar target/s4clight.jar examples/clinic.arch.yaml examples/clinic.secdsl --inspect
+java -jar target/sam4c-cli.jar examples/clinic.arch.yaml examples/clinic.secdsl --inspect
 ```
 
 See the metamodel definition:
 ```bash
-java -jar target/s4clight.jar --metamodel
+java -jar target/sam4c-cli.jar --metamodel
 ```
 
 Validate without writing output (for CI):
 ```bash
-java -jar target/s4clight.jar examples/clinic.arch.yaml examples/clinic.secdsl --validate
+java -jar target/sam4c-cli.jar examples/clinic.arch.yaml examples/clinic.secdsl --validate
 echo $?  # 0 = clean, 1 = problems
 ```
 

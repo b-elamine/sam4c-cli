@@ -153,7 +153,7 @@ Not designed for CI/CD. Requires a display server (or Xvfb) even in headless mod
 
 ```bash
 # In any CI pipeline:
-java -jar s4clight.jar arch.yaml rules.secdsl --validate
+java -jar sam4c-cli.jar arch.yaml rules.secdsl --validate
 # exit 0 = model valid and fully resolved
 # exit 1 = conformance violations or unresolved references
 ```

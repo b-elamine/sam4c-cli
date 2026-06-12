@@ -182,9 +182,9 @@ Eclipse OSGi bundles. Requires launching a second Eclipse runtime instance.
 
 ```bash
 mvn package
-java -jar target/s4clight.jar arch.yaml rules.secdsl
-java -jar target/s4clight.jar arch.yaml rules.secdsl --inspect
-java -jar target/s4clight.jar arch.yaml rules.secdsl --validate
+java -jar target/sam4c-cli.jar arch.yaml rules.secdsl
+java -jar target/sam4c-cli.jar arch.yaml rules.secdsl --inspect
+java -jar target/sam4c-cli.jar arch.yaml rules.secdsl --validate
 ```
 
 Single fat JAR. No IDE, no plugin installation, runs in any terminal or CI pipeline.

@@ -4,4 +4,4 @@ target/
 .idea/
 *.iml
 .DS_Store
-docs/codebase.md
+private/

@@ -21,17 +21,17 @@ s4cLight takes two input files -- an architecture description and a set of secur
 Requirements: Java 21, Maven 3.8+.
 
 ```bash
-cd s4cLight
+cd sam4c-cli
 mvn package -q
 ```
 
-This produces `target/s4clight.jar`. That single file contains all dependencies. You can copy it anywhere.
+This produces `target/sam4c-cli.jar`. That single file contains all dependencies. You can copy it anywhere.
 
 To make the command available globally:
 
 ```bash
-cp target/s4clight.jar ~/bin/s4clight.jar
-alias s4c="java -jar ~/bin/s4clight.jar"
+cp target/sam4c-cli.jar ~/bin/sam4c-cli.jar
+alias s4c="java -jar ~/bin/sam4c-cli.jar"
 ```
 
 ---
@@ -39,8 +39,8 @@ alias s4c="java -jar ~/bin/s4clight.jar"
 ## 2. CLI reference
 
 ```
-s4clight <arch-file> <rules-file> [options]
-s4clight --metamodel
+sam4c-cli <arch-file> <rules-file> [options]
+sam4c-cli --metamodel
 ```
 
 ### Arguments
@@ -65,28 +65,28 @@ s4clight --metamodel
 
 Merge and write output:
 ```bash
-java -jar s4clight.jar clinic.arch.yaml clinic.secdsl
+java -jar sam4c-cli.jar clinic.arch.yaml clinic.secdsl
 ```
 
 Merge with explicit output path:
 ```bash
-java -jar s4clight.jar clinic.arch.yaml clinic.secdsl -o output/clinic.sam4c.json
+java -jar sam4c-cli.jar clinic.arch.yaml clinic.secdsl -o output/clinic.sam4c.json
 ```
 
 Validate without writing output (useful in CI):
 ```bash
-java -jar s4clight.jar clinic.arch.yaml clinic.secdsl --validate
+java -jar sam4c-cli.jar clinic.arch.yaml clinic.secdsl --validate
 echo $?   # 0 = all resolved, 1 = unresolved references
 ```
 
 Inspect the full object graph traversal:
 ```bash
-java -jar s4clight.jar clinic.arch.yaml clinic.secdsl --inspect
+java -jar sam4c-cli.jar clinic.arch.yaml clinic.secdsl --inspect
 ```
 
 Print the M2 metamodel (no input files needed):
 ```bash
-java -jar s4clight.jar --metamodel
+java -jar sam4c-cli.jar --metamodel
 ```
 
 ### Terminal output
