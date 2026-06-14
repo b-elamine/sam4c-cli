@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>clinic-portal -- SAM4C Model Graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; display: flex; height: 100vh; }
+
+#sidebar {
+  width: 300px; min-width: 260px; background: #1e1e2e; color: #cdd6f4;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#sidebar h1 { font-size: 14px; padding: 16px; background: #181825; color: #cba6f7; border-bottom: 1px solid #313244; }
+#sidebar h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6c7086; padding: 12px 16px 6px; }
+
+#info-panel { padding: 12px 16px; border-bottom: 1px solid #313244; min-height: 100px; }
+#info-panel p { font-size: 12px; color: #6c7086; }
+#info-name  { font-size: 15px; font-weight: bold; color: #cba6f7; margin-bottom: 6px; }
+#info-type  { font-size: 12px; color: #89dceb; margin-bottom: 6px; }
+#info-attrs { font-size: 11px; color: #a6e3a1; line-height: 1.6; }
+#info-ports { font-size: 11px; color: #fab387; margin-top: 4px; }
+
+#view-panel { padding: 10px 16px; border-bottom: 1px solid #313244; }
+.view-btn {
+  display: inline-block; font-size: 11px; padding: 5px 12px; margin: 2px;
+  border-radius: 6px; border: 1px solid #45475a; background: #313244; color: #cdd6f4;
+  cursor: pointer; transition: all 0.15s;
+}
+.view-btn.active { background: #3949ab; color: #fff; border-color: #1565c0; }
+
+#filter-panel { padding: 10px 16px; border-bottom: 1px solid #313244; }
+.filter-btn {
+  display: inline-block; font-size: 10px; padding: 3px 8px; margin: 2px;
+  border-radius: 10px; border: none; cursor: pointer; color: white; opacity: 0.9;
+}
+.filter-btn.off { opacity: 0.3; }
+
+#coverage-panel { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+.ctx-item { font-size: 11px; margin: 4px 0; line-height: 1.5; }
+.ctx-name  { color: #cba6f7; font-weight: bold; margin-right: 6px; }
+.ctx-comps { color: #a6e3a1; }
+
+#legend { padding: 12px 16px; border-top: 1px solid #313244; font-size: 11px; color: #cdd6f4; }
+.legend-item { display: flex; align-items: center; margin: 3px 0; color: #cdd6f4; }
+.legend-line { width: 24px; height: 3px; margin-right: 8px; border-radius: 2px; flex-shrink: 0; }
+.legend-dash { border-top: 2px dashed; height: 0; width: 24px; margin-right: 8px; flex-shrink: 0; }
+
+#cy-container { flex: 1; position: relative; background: #fafafa; }
+#cy { width: 100%; height: 100%; }
+
+#controls { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
+.ctrl-btn {
+  background: #1e1e2e; color: #cdd6f4; border: 1px solid #313244;
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.ctrl-btn:hover { background: #313244; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>&#9650; clinic-portal</h1>
+
+  <h2>View</h2>
+  <div id="view-panel">
+    <button class="view-btn active" data-view="both">Both</button>
+    <button class="view-btn" data-view="arch">Architecture</button>
+    <button class="view-btn" data-view="security">Security</button>
+  </div>
+
+  <h2>Selected</h2>
+  <div id="info-panel">
+    <p>Click a node or edge to inspect it.</p>
+  </div>
+
+  <h2>Filter rules</h2>
+  <div id="filter-panel">
+    <button class="filter-btn" style="background:#1565c0" data-rule="Confidentiality">Confidentiality</button>
+    <button class="filter-btn" style="background:#2e7d32" data-rule="Integrity">Integrity</button>
+    <button class="filter-btn" style="background:#c62828" data-rule="Isolation">Isolation</button>
+    <button class="filter-btn" style="background:#6a1b9a" data-rule="Authentication">Authentication</button>
+  </div>
+
+  <h2>Coverage</h2>
+  <div id="coverage-panel"><div class='ctx-item'><span class='ctx-name'>frontendCtx</span><span class='ctx-comps'>FrontendVM Nginx </span></div><div class='ctx-item'><span class='ctx-name'>backendCtx</span><span class='ctx-comps'>BackendVM SpringAPI </span></div><div class='ctx-item'><span class='ctx-name'>dbCtx</span><span class='ctx-comps'>DatabaseVM PatientDB </span></div><div class='ctx-item'><span class='ctx-name'>adminCtx</span><span class='ctx-comps'>AdminVM AdminDashboard </span></div><div class='ctx-item'><span class='ctx-name'>adminRoleCtx</span><span class='ctx-comps'>AdminDashboard </span></div><div class='ctx-item'><span class='ctx-name'>clinicalDataCtx</span><span class='ctx-comps'>PatientDB </span></div><div class='ctx-item'><span class='ctx-name'>piiCtx</span><span class='ctx-comps'>(no match)</span></div></div>
+
+  <div id="legend">
+    <div class="legend-item"><div class="legend-line" style="background:#1565c0"></div>Confidentiality</div>
+    <div class="legend-item"><div class="legend-line" style="background:#2e7d32"></div>Integrity</div>
+    <div class="legend-item"><div class="legend-dash" style="border-color:#c62828"></div>Isolation</div>
+    <div class="legend-item"><div class="legend-line" style="background:#6a1b9a"></div>Authentication</div>
+    <div class="legend-item"><div class="legend-line" style="background:#455a64"></div>Architecture link</div>
+  </div>
+</div>
+
+<div id="cy-container">
+  <div id="cy"></div>
+  <div id="controls">
+    <button class="ctrl-btn" onclick="cy.fit(null, 40)">Fit</button>
+    <button class="ctrl-btn" onclick="relayout()">Re-layout</button>
+  </div>
+</div>
+
+<script>
+const elements = {
+  nodes: [ { data: { id:'n0', label:'FrontendVM', type:'VM', attrs:'{Domain=frontend}', ports:'', bg:'#e8eaf6', shape:'roundrectangle' } },
+{ data: { id:'n1', label:'Nginx', type:'App', attrs:'{Domain=frontend}', ports:'http_in, api_out', bg:'#1565c0', shape:'ellipse', parent: 'n0' } },
+{ data: { id:'n2', label:'BackendVM', type:'VM', attrs:'{Domain=backend}', ports:'', bg:'#e8eaf6', shape:'roundrectangle' } },
+{ data: { id:'n3', label:'SpringAPI', type:'App', attrs:'{Domain=backend}', ports:'api_in, db_out, admin_in', bg:'#1565c0', shape:'ellipse', parent: 'n2' } },
+{ data: { id:'n4', label:'DatabaseVM', type:'VM', attrs:'{Domain=database}', ports:'', bg:'#e8eaf6', shape:'roundrectangle' } },
+{ data: { id:'n5', label:'PatientDB', type:'Data', attrs:'{Domain=database, DataClass=clinical}', ports:'db_in', bg:'#e65100', shape:'barrel', parent: 'n4' } },
+{ data: { id:'n6', label:'AdminVM', type:'VM', attrs:'{Domain=admin}', ports:'', bg:'#e8eaf6', shape:'roundrectangle' } },
+{ data: { id:'n7', label:'AdminDashboard', type:'App', attrs:'{Domain=admin, Role=administrator}', ports:'mgmt_out', bg:'#1565c0', shape:'ellipse', parent: 'n6' } },
+{ data: { id:'conn_FE_to_BE', label:'FE_to_BE', type:'Connector', attrs:'', ports:'', bg:'#78909c', shape:'diamond' } },
+{ data: { id:'conn_BE_to_DB', label:'BE_to_DB', type:'Connector', attrs:'', ports:'', bg:'#78909c', shape:'diamond' } },
+{ data: { id:'conn_Admin_to_BE', label:'Admin_to_BE', type:'Connector', attrs:'', ports:'', bg:'#78909c', shape:'diamond' } },
+{ data: { id:'conn_Internet', label:'Internet (external)', type:'Connector', attrs:'', ports:'', bg:'#546e7a', shape:'diamond' } } ],
+  edges: [ { data: { id:'arch_Nginx_Internet', source:'n1', target:'conn_Internet', label:'', color:'#455a64', style:'solid', layer:'arch' } },
+{ data: { id:'arch_Nginx_FE_to_BE', source:'n1', target:'conn_FE_to_BE', label:'', color:'#455a64', style:'solid', layer:'arch' } },
+{ data: { id:'arch_SpringAPI_FE_to_BE', source:'n3', target:'conn_FE_to_BE', label:'', color:'#455a64', style:'solid', layer:'arch' } },
+{ data: { id:'arch_SpringAPI_BE_to_DB', source:'n3', target:'conn_BE_to_DB', label:'', color:'#455a64', style:'solid', layer:'arch' } },
+{ data: { id:'arch_PatientDB_BE_to_DB', source:'n5', target:'conn_BE_to_DB', label:'', color:'#455a64', style:'solid', layer:'arch' } },
+{ data: { id:'arch_AdminDashboard_Admin_to_BE', source:'n7', target:'conn_Admin_to_BE', label:'', color:'#455a64', style:'solid', layer:'arch' } },
+{ data: { id:'arch_SpringAPI_Admin_to_BE', source:'n3', target:'conn_Admin_to_BE', label:'', color:'#455a64', style:'solid', layer:'arch' } },
+{ data: { id:'e0', source:'n5', target:'n3', label:'Confidentiality', color:'#1565c0', style:'solid', layer:'rule' } },
+{ data: { id:'e1', source:'n3', target:'n5', label:'Integrity', color:'#2e7d32', style:'solid', layer:'rule' } },
+{ data: { id:'e2', source:'n7', target:'n3', label:'Authentication', color:'#6a1b9a', style:'solid', layer:'rule' } },
+{ data: { id:'e3', source:'n5', target:'n1', label:'Isolation', color:'#c62828', style:'dashed', layer:'rule' } },
+{ data: { id:'e4', source:'n7', target:'n1', label:'Isolation', color:'#c62828', style:'dashed', layer:'rule' } } ]
+};
+
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements: elements,
+  style: [
+    {
+      selector: 'node',
+      style: {
+        'label': 'data(label)',
+        'background-color': 'data(bg)',
+        'shape': 'data(shape)',
+        'color': '#fff',
+        'font-size': '11px',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-wrap': 'wrap',
+        'border-width': 1,
+        'border-color': '#555',
+        'padding': '10px'
+      }
+    },
+    {
+      selector: 'node[type = "VM"]',
+      style: {
+        'background-color': '#e8eaf6',
+        'color': '#1a237e',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-valign': 'top',
+        'text-halign': 'center',
+        'border-color': '#3949ab',
+        'border-width': 2,
+        'padding': '20px'
+      }
+    },
+    {
+      selector: 'node[type = "Connector"]',
+      style: {
+        'background-color': 'data(bg)',
+        'color': '#fff',
+        'font-size': '9px',
+        'shape': 'diamond',
+        'width': '34px',
+        'height': '34px',
+        'border-width': 1,
+        'border-color': '#37474f'
+      }
+    },
+    {
+      selector: ':parent',
+      style: { 'background-opacity': 0.15 }
+    },
+    {
+      selector: 'edge',
+      style: {
+        'line-color': 'data(color)',
+        'target-arrow-color': 'data(color)',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 1.2,
+        'line-style': 'data(style)',
+        'label': 'data(label)',
+        'font-size': '9px',
+        'color': '#333',
+        'text-background-color': '#fff',
+        'text-background-opacity': 0.9,
+        'text-background-padding': '2px',
+        'curve-style': 'bezier',
+        'width': 2
+      }
+    },
+    {
+      selector: 'edge[layer = "arch"]',
+      style: {
+        'line-color': '#455a64',
+        'target-arrow-shape': 'none',
+        'width': 1.5,
+        'opacity': 0.45
+      }
+    },
+    {
+      selector: '.highlighted',
+      style: { 'border-color': '#f9a825', 'border-width': 3, 'opacity': 1 }
+    },
+    {
+      selector: '.faded',
+      style: { 'opacity': 0.15 }
+    }
+  ],
+  layout: { name: 'cose', animate: true, animationDuration: 600, fit: true, padding: 40, nodeRepulsion: 9000, idealEdgeLength: 130 }
+});
+
+// Click node -- show details and highlight neighbourhood
+cy.on('tap', 'node', function(e) {
+  const d = e.target.data();
+  cy.elements().removeClass('highlighted faded');
+  e.target.addClass('highlighted');
+  e.target.neighborhood().addClass('highlighted');
+  cy.elements().not(e.target.neighborhood()).not(e.target).addClass('faded');
+
+  document.getElementById('info-panel').innerHTML =
+    '<div id="info-name">' + d.label + '</div>' +
+    '<div id="info-type">Type: ' + d.type + '</div>' +
+    (d.attrs ? '<div id="info-attrs">Attributes: ' + d.attrs + '</div>' : '') +
+    (d.ports ? '<div id="info-ports">Ports: ' + d.ports + '</div>' : '');
+});
+
+// Click edge -- show rule details
+cy.on('tap', 'edge', function(e) {
+  const d = e.target.data();
+  cy.elements().removeClass('highlighted faded');
+  e.target.addClass('highlighted');
+  e.target.source().addClass('highlighted');
+  e.target.target().addClass('highlighted');
+  cy.elements().not(e.target).not(e.target.source()).not(e.target.target()).addClass('faded');
+
+  const label = d.label || 'Architecture link';
+  document.getElementById('info-panel').innerHTML =
+    '<div id="info-name">' + label + '</div>' +
+    '<div id="info-type">' + e.target.source().data('label') +
+    ' \u2192 ' + e.target.target().data('label') + '</div>';
+});
+
+// Click background -- reset
+cy.on('tap', function(e) {
+  if (e.target === cy) {
+    cy.elements().removeClass('highlighted faded');
+    document.getElementById('info-panel').innerHTML =
+      '<p>Click a node or edge to inspect it.</p>';
+  }
+});
+
+// View toggle: both / architecture / security
+let currentView = 'both';
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    currentView = this.dataset.view;
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    applyView();
+  });
+});
+
+function applyView() {
+  if (currentView === 'both') {
+    cy.elements().style('display', 'element');
+    cy.edges('[layer = "rule"]').forEach(applyRuleFilter);
+  } else if (currentView === 'arch') {
+    cy.edges('[layer = "rule"]').style('display', 'none');
+    cy.edges('[layer = "arch"]').style('display', 'element');
+    cy.nodes().style('display', 'element');
+  } else if (currentView === 'security') {
+    cy.edges('[layer = "arch"]').style('display', 'none');
+    cy.edges('[layer = "rule"]').forEach(applyRuleFilter);
+    cy.nodes('[type = "Connector"]').style('display', 'none');
+    cy.nodes('[type != "Connector"]').style('display', 'element');
+  }
+}
+
+// Rule type filter
+const activeFilters = new Set(['Confidentiality','Integrity','Isolation','Authentication']);
+function applyRuleFilter(edge) {
+  const visible = activeFilters.has(edge.data('label'));
+  edge.style('display', visible ? 'element' : 'none');
+}
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const rule = this.dataset.rule;
+    if (activeFilters.has(rule)) {
+      activeFilters.delete(rule);
+      this.classList.add('off');
+    } else {
+      activeFilters.add(rule);
+      this.classList.remove('off');
+    }
+    applyView();
+  });
+});
+
+function relayout() {
+  cy.layout({ name: 'cose', animate: true, animationDuration: 600, fit: true, padding: 40, nodeRepulsion: 9000, idealEdgeLength: 130 }).run();
+}
+</script>
+</body>
+</html>

@@ -14,6 +14,7 @@ import sam4c.light.metamodel.ConformanceChecker;
 import sam4c.light.metamodel.MClass;
 import sam4c.light.metamodel.MPackage;
 import sam4c.light.metamodel.Sam4cMetamodel;
+import sam4c.light.output.HtmlReportGenerator;
 import sam4c.light.output.ModelInspector;
 import sam4c.light.output.ModelSerializer;
 import sam4c.light.registry.ComponentRegistry;
@@ -48,6 +49,9 @@ public class Main implements Callable<Integer> {
 
     @Option(names = {"--validate"}, description = "Print resolution report and exit without writing output")
     private boolean validateOnly;
+
+    @Option(names = {"--html"}, description = "Generate an interactive HTML graph from the in-memory object graph")
+    private boolean generateHtml;
 
     @Override
     public Integer call() {
@@ -105,6 +109,14 @@ public class Main implements Callable<Integer> {
 
             ModelSerializer.write(unified, out);
             System.out.println("\nWrote unified model to: " + out);
+
+            if (generateHtml) {
+                File htmlOut = new File(out.getParent(),
+                        out.getName().replace(".sam4c.json", "") + ".sam4c.html");
+                HtmlReportGenerator.write(unified, htmlOut);
+                System.out.println("Wrote interactive graph to: " + htmlOut);
+            }
+
             return 0;
 
         } catch (Exception e) {
