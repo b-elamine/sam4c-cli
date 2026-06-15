@@ -60,6 +60,7 @@ public final class ArchMetamodel {
             MClass.builder("Link")
                 .attr("portRef",       STRING, 1, 1)
                 .attr("connectorName", STRING, 1, 1)
+                .attr("direction",     STRING, 0, 1)   // in | out | inout (default inout)
                 .build(),
 
             MClass.builder("Architecture").superType("ElementApp")

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import sam4c.light.model.Architecture;
 import sam4c.light.model.Component;
 import sam4c.light.model.Connector;
+import sam4c.light.model.Direction;
 import sam4c.light.model.Link;
 import sam4c.light.registry.ComponentRegistry;
 
@@ -21,12 +22,23 @@ public class ArchLoader {
         this.registry = registry;
     }
 
+    /** Load from a file. */
     @SuppressWarnings("unchecked")
     public Architecture load(File file) throws IOException {
-        YAMLMapper mapper = new YAMLMapper();
-        Map<String, Object> root = mapper.readValue(file, Map.class);
+        Map<String, Object> root = new YAMLMapper().readValue(file, Map.class);
+        return build(root, file.getName());
+    }
 
-        String name = (String) root.getOrDefault("name", file.getName());
+    /** Load from raw YAML content (used by the web server, which has no file). */
+    @SuppressWarnings("unchecked")
+    public Architecture load(String yaml, String fallbackName) throws IOException {
+        Map<String, Object> root = new YAMLMapper().readValue(yaml, Map.class);
+        return build(root, fallbackName);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Architecture build(Map<String, Object> root, String fallbackName) throws IOException {
+        String name = (String) root.getOrDefault("name", fallbackName);
 
         List<Component> components = new ArrayList<>();
         Object rawComponents = root.get("components");
@@ -61,7 +73,13 @@ public class ArchLoader {
                     String connector = (String) m.get("connector");
                     if (port == null || connector == null)
                         throw new IOException("Each link requires 'port' and 'connector' fields");
-                    links.add(new Link(port, connector));
+                    Direction dir;
+                    try {
+                        dir = Direction.parse((String) m.get("direction"));
+                    } catch (IllegalArgumentException e) {
+                        throw new IOException("Link " + port + " -> " + connector + ": " + e.getMessage());
+                    }
+                    links.add(new Link(port, connector, dir));
                 }
             }
         }

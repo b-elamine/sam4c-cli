@@ -77,6 +77,23 @@ public class ModelInspector {
                 System.out.println("    Generator hint: put an auth gate on every tctx port that serves sctx traffic");
             }
         }
+        printPaths(rr);
+    }
+
+    // The concrete connector paths this rule governs -- the generator's anchor point.
+    private static void printPaths(ResolvedRule rr) {
+        if (rr.paths().isEmpty()) {
+            System.out.println("    Paths        : (none -- sides share no connector)");
+            return;
+        }
+        System.out.println("    Paths        :");
+        for (ResolvedPath path : rr.paths()) {
+            System.out.printf("      via connector '%s'%n", path.connector());
+            for (Link l : path.sctxLinks())
+                System.out.printf("        sctx %s [%s]%n", l.portRef(), l.direction().token());
+            for (Link l : path.tctxLinks())
+                System.out.printf("        tctx %s [%s]%n", l.portRef(), l.direction().token());
+        }
     }
 
     private static void printSide(String label, List<Component> components) {

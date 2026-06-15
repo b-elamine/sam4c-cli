@@ -26,6 +26,11 @@ import java.util.*;
 public class SecDslScaffolder {
 
     public static void write(Architecture arch, File output) throws IOException {
+        Files.writeString(output.toPath(), generate(arch));
+    }
+
+    /** Produce the starter .secdsl content as a string (used by file write and the web server). */
+    public static String generate(Architecture arch) {
         // Collect attribute key -> ordered set of values across all components
         Map<String, LinkedHashSet<String>> attrValues = new LinkedHashMap<>();
         collect(arch.components(), attrValues);
@@ -38,16 +43,14 @@ public class SecDslScaffolder {
         if (attrValues.isEmpty()) {
             sb.append("// No attributes found on any component in the architecture.\n");
             sb.append("// Add `attributes:` blocks to your components first, then re-run.\n");
-            Files.writeString(output.toPath(), sb.toString());
-            return;
+            return sb.toString();
         }
 
         // 1. Attribute declarations
         sb.append("// ---- Attributes (one value list per key found in the architecture) ----\n");
-        attrValues.forEach((key, values) -> {
+        attrValues.forEach((key, values) ->
             sb.append("#attribute ").append(key)
-              .append(" = (").append(String.join(", ", values)).append(");\n");
-        });
+              .append(" = (").append(String.join(", ", values)).append(");\n"));
         sb.append("\n");
 
         // 2. Context declarations -- one per (key=value) pair
@@ -67,7 +70,7 @@ public class SecDslScaffolder {
         sb.append("// #property Isolation(sourceCtx, targetCtx);\n");
         sb.append("// #property Authentication(whoCtx, mechanismCtx) -> targetCtx;\n");
 
-        Files.writeString(output.toPath(), sb.toString());
+        return sb.toString();
     }
 
     /** Recursively walk the component tree collecting attribute keys and values. */

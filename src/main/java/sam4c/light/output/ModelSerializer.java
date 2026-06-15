@@ -96,6 +96,20 @@ public class ModelSerializer {
                     writeComponentArray(g, "tctx", rr.tctxComponents());
                 if (!rr.actxComponents().isEmpty())
                     writeComponentArray(g, "actx", rr.actxComponents());
+                // Resolved network paths: the connector(s) and directed links that
+                // carry traffic between sctx and tctx -- where a generator places controls.
+                if (!rr.paths().isEmpty()) {
+                    g.writeFieldName("paths");
+                    g.writeStartArray();
+                    for (ResolvedPath path : rr.paths()) {
+                        g.writeStartObject();
+                        g.writeStringField("connector", path.connector());
+                        writeLinkArray(g, "sctxLinks", path.sctxLinks());
+                        writeLinkArray(g, "tctxLinks", path.tctxLinks());
+                        g.writeEndObject();
+                    }
+                    g.writeEndArray();
+                }
                 g.writeEndObject();
             }
             g.writeEndArray();
@@ -113,6 +127,20 @@ public class ModelSerializer {
                 throws IOException {
             g.writeFieldName(field);
             writeComponentArray(g, comps);
+        }
+
+        // Writes a named array of links as {port, direction} objects
+        private void writeLinkArray(JsonGenerator g, String field, List<Link> links)
+                throws IOException {
+            g.writeFieldName(field);
+            g.writeStartArray();
+            for (Link l : links) {
+                g.writeStartObject();
+                g.writeStringField("port", l.portRef());
+                g.writeStringField("direction", l.direction().token());
+                g.writeEndObject();
+            }
+            g.writeEndArray();
         }
 
         // Writes an array of full component objects (no field name wrapper)

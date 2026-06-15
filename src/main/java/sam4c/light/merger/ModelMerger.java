@@ -25,7 +25,7 @@ public class ModelMerger {
 
         List<String> unresolved = new ArrayList<>();
         List<ResolvedRule> resolvedRules = sec.rules().stream()
-                .map(rule -> resolveRule(rule, coverage, all, unresolved))
+                .map(rule -> resolveRule(rule, coverage, all, arch, unresolved))
                 .collect(Collectors.toList());
 
         return new UnifiedModel(arch, sec, coverage, resolvedRules, unresolved);
@@ -71,25 +71,65 @@ public class ModelMerger {
     private static ResolvedRule resolveRule(SecurityRule rule,
                                              Map<String, List<Component>> coverage,
                                              List<Component> all,
+                                             Architecture arch,
                                              List<String> unresolved) {
-        return switch (rule) {
-            case Confidentiality r -> new ResolvedRule(rule,
-                    resolveRef(r.sctx(), coverage, all, unresolved),
-                    resolveRef(r.tctx(), coverage, all, unresolved),
-                    List.of());
-            case Integrity r -> new ResolvedRule(rule,
-                    resolveRef(r.sctx(), coverage, all, unresolved),
-                    resolveRef(r.tctx(), coverage, all, unresolved),
-                    List.of());
-            case Isolation r -> new ResolvedRule(rule,
-                    resolveRef(r.sctx(), coverage, all, unresolved),
-                    resolveRef(r.tctx(), coverage, all, unresolved),
-                    List.of());
-            case Authentication r -> new ResolvedRule(rule,
-                    resolveRef(r.sctx(), coverage, all, unresolved),
-                    resolveRef(r.tctx(), coverage, all, unresolved),
-                    resolveRef(r.actx(), coverage, all, unresolved));
-        };
+        // Resolve the three argument slots to component lists (actx only for Authentication)
+        List<Component> sctx = List.of(), tctx = List.of(), actx = List.of();
+        switch (rule) {
+            case Confidentiality r -> { sctx = resolveRef(r.sctx(), coverage, all, unresolved);
+                                        tctx = resolveRef(r.tctx(), coverage, all, unresolved); }
+            case Integrity r       -> { sctx = resolveRef(r.sctx(), coverage, all, unresolved);
+                                        tctx = resolveRef(r.tctx(), coverage, all, unresolved); }
+            case Isolation r       -> { sctx = resolveRef(r.sctx(), coverage, all, unresolved);
+                                        tctx = resolveRef(r.tctx(), coverage, all, unresolved); }
+            case Authentication r  -> { sctx = resolveRef(r.sctx(), coverage, all, unresolved);
+                                        tctx = resolveRef(r.tctx(), coverage, all, unresolved);
+                                        actx = resolveRef(r.actx(), coverage, all, unresolved); }
+        }
+        // Resolve the concrete connector paths between the source and target sides
+        List<ResolvedPath> paths = resolvePaths(sctx, tctx, arch);
+        return new ResolvedRule(rule, sctx, tctx, actx, paths);
+    }
+
+    // -------------------------------------------------------------------------
+    // Path resolution: which connector(s) actually carry traffic between the
+    // rule's source side and target side.
+    //
+    // A path exists when an sctx component and a tctx component are both attached
+    // (via links) to the SAME connector. We record that connector plus the links
+    // (with direction) on each side. This is what a generator needs to place a
+    // control on the right channel.
+    // -------------------------------------------------------------------------
+
+    private static List<ResolvedPath> resolvePaths(List<Component> sctx,
+                                                   List<Component> tctx,
+                                                   Architecture arch) {
+        if (sctx.isEmpty() || tctx.isEmpty()) return List.of();
+
+        Set<String> sNames = sctx.stream().map(Component::name).collect(Collectors.toSet());
+        Set<String> tNames = tctx.stream().map(Component::name).collect(Collectors.toSet());
+
+        List<ResolvedPath> paths = new ArrayList<>();
+        for (Connector conn : arch.connectors()) {
+            List<Link> sLinks = new ArrayList<>();
+            List<Link> tLinks = new ArrayList<>();
+            for (Link l : arch.links()) {
+                if (!l.connectorName().equals(conn.name())) continue;
+                String comp = componentOf(l.portRef());
+                if (sNames.contains(comp)) sLinks.add(l);
+                if (tNames.contains(comp)) tLinks.add(l);
+            }
+            // A real path needs at least one link from each side on this connector
+            if (!sLinks.isEmpty() && !tLinks.isEmpty())
+                paths.add(new ResolvedPath(conn.name(), sLinks, tLinks));
+        }
+        return paths;
+    }
+
+    /** Component name part of a "Component.port" reference (or the whole string if no dot). */
+    private static String componentOf(String portRef) {
+        int dot = portRef.indexOf('.');
+        return dot < 0 ? portRef : portRef.substring(0, dot);
     }
 
     /**

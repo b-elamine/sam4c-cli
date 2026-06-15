@@ -55,17 +55,31 @@ connectors:
     external: true
 
 links:
+  # Internet -> Nginx (Nginx receives inbound web traffic)
   - port: Nginx.http_in
     connector: Internet
+    direction: in
+  # Nginx -> FE_to_BE (Nginx sends API calls toward the backend)
   - port: Nginx.api_out
     connector: FE_to_BE
+    direction: out
+  # FE_to_BE -> SpringAPI (backend receives the frontend's calls)
   - port: SpringAPI.api_in
     connector: FE_to_BE
+    direction: in
+  # SpringAPI -> BE_to_DB (backend sends queries toward the database)
   - port: SpringAPI.db_out
     connector: BE_to_DB
+    direction: out
+  # BE_to_DB -> PatientDB (database receives the queries)
   - port: PatientDB.db_in
     connector: BE_to_DB
+    direction: in
+  # AdminDashboard -> Admin_to_BE (admin sends management calls)
   - port: AdminDashboard.mgmt_out
     connector: Admin_to_BE
+    direction: out
+  # Admin_to_BE -> SpringAPI (backend receives admin management calls)
   - port: SpringAPI.admin_in
     connector: Admin_to_BE
+    direction: in

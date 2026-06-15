@@ -114,25 +114,32 @@
     } ],
     "links" : [ {
       "portRef" : "Nginx.http_in",
-      "connectorName" : "Internet"
+      "connectorName" : "Internet",
+      "direction" : "IN"
     }, {
       "portRef" : "Nginx.api_out",
-      "connectorName" : "FE_to_BE"
+      "connectorName" : "FE_to_BE",
+      "direction" : "OUT"
     }, {
       "portRef" : "SpringAPI.api_in",
-      "connectorName" : "FE_to_BE"
+      "connectorName" : "FE_to_BE",
+      "direction" : "IN"
     }, {
       "portRef" : "SpringAPI.db_out",
-      "connectorName" : "BE_to_DB"
+      "connectorName" : "BE_to_DB",
+      "direction" : "OUT"
     }, {
       "portRef" : "PatientDB.db_in",
-      "connectorName" : "BE_to_DB"
+      "connectorName" : "BE_to_DB",
+      "direction" : "IN"
     }, {
       "portRef" : "AdminDashboard.mgmt_out",
-      "connectorName" : "Admin_to_BE"
+      "connectorName" : "Admin_to_BE",
+      "direction" : "OUT"
     }, {
       "portRef" : "SpringAPI.admin_in",
-      "connectorName" : "Admin_to_BE"
+      "connectorName" : "Admin_to_BE",
+      "direction" : "IN"
     } ]
   },
   "security" : {
@@ -365,6 +372,17 @@
         "Domain" : "backend"
       },
       "ports" : [ "api_in", "db_out", "admin_in" ]
+    } ],
+    "paths" : [ {
+      "connector" : "BE_to_DB",
+      "sctxLinks" : [ {
+        "port" : "PatientDB.db_in",
+        "direction" : "in"
+      } ],
+      "tctxLinks" : [ {
+        "port" : "SpringAPI.db_out",
+        "direction" : "out"
+      } ]
     } ]
   }, {
     "type" : "Integrity",
@@ -398,6 +416,17 @@
         "DataClass" : "clinical"
       },
       "ports" : [ "db_in" ]
+    } ],
+    "paths" : [ {
+      "connector" : "BE_to_DB",
+      "sctxLinks" : [ {
+        "port" : "SpringAPI.db_out",
+        "direction" : "out"
+      } ],
+      "tctxLinks" : [ {
+        "port" : "PatientDB.db_in",
+        "direction" : "in"
+      } ]
     } ]
   }, {
     "type" : "Authentication",
@@ -440,6 +469,17 @@
         "Role" : "administrator"
       },
       "ports" : [ "mgmt_out" ]
+    } ],
+    "paths" : [ {
+      "connector" : "Admin_to_BE",
+      "sctxLinks" : [ {
+        "port" : "AdminDashboard.mgmt_out",
+        "direction" : "out"
+      } ],
+      "tctxLinks" : [ {
+        "port" : "SpringAPI.admin_in",
+        "direction" : "in"
+      } ]
     } ]
   }, {
     "type" : "Isolation",
@@ -532,6 +572,17 @@
         "Domain" : "backend"
       },
       "ports" : [ "api_in", "db_out", "admin_in" ]
+    } ],
+    "paths" : [ {
+      "connector" : "BE_to_DB",
+      "sctxLinks" : [ {
+        "port" : "PatientDB.db_in",
+        "direction" : "in"
+      } ],
+      "tctxLinks" : [ {
+        "port" : "SpringAPI.db_out",
+        "direction" : "out"
+      } ]
     } ]
   }, {
     "type" : "Confidentiality",

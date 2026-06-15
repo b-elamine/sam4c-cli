@@ -5,13 +5,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import sam4c.light.loader.ArchLoader;
-import sam4c.light.loader.DslParser;
-import sam4c.light.merger.ModelMerger;
-import sam4c.light.merger.SemanticValidator;
 import sam4c.light.model.Architecture;
-import sam4c.light.model.SecurityModel;
 import sam4c.light.model.UnifiedModel;
-import sam4c.light.metamodel.ConformanceChecker;
 import sam4c.light.metamodel.MClass;
 import sam4c.light.metamodel.MPackage;
 import sam4c.light.metamodel.Sam4cMetamodel;
@@ -19,11 +14,13 @@ import sam4c.light.output.HtmlReportGenerator;
 import sam4c.light.output.ModelInspector;
 import sam4c.light.output.ModelSerializer;
 import sam4c.light.output.SecDslScaffolder;
+import sam4c.light.pipeline.Pipeline;
+import sam4c.light.pipeline.PipelineResult;
 import sam4c.light.registry.ComponentRegistry;
-import sam4c.light.registry.PropertyRegistry;
+import sam4c.light.web.WebServer;
 
 import java.io.File;
-import java.util.List;
+import java.nio.file.Files;
 import java.util.concurrent.Callable;
 
 @Command(
@@ -58,6 +55,12 @@ public class Main implements Callable<Integer> {
     @Option(names = {"--init-secdsl"}, description = "Generate a starter .secdsl file from the architecture's attributes and exit")
     private boolean initSecdsl;
 
+    @Option(names = {"--serve"}, description = "Start the interactive web modeller (browser editor + live graph)")
+    private boolean serve;
+
+    @Option(names = {"--port"}, description = "Port for --serve (default 8080)")
+    private int port = 8080;
+
     @Override
     public Integer call() {
         try {
@@ -84,6 +87,12 @@ public class Main implements Callable<Integer> {
                 return 0;
             }
 
+            if (serve) {
+                new WebServer().start(port);
+                Thread.currentThread().join(); // block until Ctrl+C
+                return 0;
+            }
+
             if (archFile == null || rulesFile == null) {
                 System.err.println("Usage: s4clight <arch.yaml> <rules.secdsl> [options]");
                 return 1;
@@ -91,29 +100,21 @@ public class Main implements Callable<Integer> {
             if (!archFile.exists()) { System.err.println("Architecture file not found: " + archFile); return 1; }
             if (!rulesFile.exists()) { System.err.println("Rules file not found: " + rulesFile); return 1; }
 
-            ComponentRegistry compReg  = ComponentRegistry.withDefaults();
-            PropertyRegistry  propReg  = PropertyRegistry.withDefaults();
-
             System.out.println("Loading architecture: " + archFile);
-            Architecture arch = new ArchLoader(compReg).load(archFile);
-
             System.out.println("Parsing security rules: " + rulesFile);
-            SecurityModel sec = DslParser.parse(rulesFile, propReg);
+            String archContent  = Files.readString(archFile.toPath());
+            String rulesContent = Files.readString(rulesFile.toPath());
 
-            System.out.println("Checking conformance against M2 metamodel...");
-            ConformanceChecker checker = new ConformanceChecker(Sam4cMetamodel.INSTANCE);
-            List<String> archErrors = checker.check(arch);
-            List<String> secErrors  = checker.check(sec);
-            if (!archErrors.isEmpty() || !secErrors.isEmpty()) {
+            System.out.println("Running pipeline (conformance + merge + semantic checks)...");
+            PipelineResult result = new Pipeline().run(archContent, rulesContent, archFile.getName());
+
+            if (!result.ok()) {
                 System.err.println("Conformance violations:");
-                archErrors.forEach(e -> System.err.println("  [arch] " + e));
-                secErrors .forEach(e -> System.err.println("  [sec]  " + e));
+                result.conformanceErrors().forEach(e -> System.err.println("  " + e));
                 return 1;
             }
             System.out.println("  Conformance OK");
-
-            System.out.println("Merging and resolving cross-references...");
-            UnifiedModel unified = ModelMerger.merge(arch, sec);
+            UnifiedModel unified = result.model();
 
             if (inspect) {
                 ModelInspector.inspect(unified);
@@ -121,11 +122,9 @@ public class Main implements Callable<Integer> {
                 printReport(unified);
             }
 
-            // Semantic validation: rules/contexts that resolve to nothing
-            List<String> warnings = SemanticValidator.validate(unified);
-            if (!warnings.isEmpty()) {
+            if (!result.warnings().isEmpty()) {
                 System.out.println("\n-- Semantic warnings --");
-                warnings.forEach(w -> System.out.println("  ! " + w));
+                result.warnings().forEach(w -> System.out.println("  ! " + w));
             }
 
             if (!unified.unresolved().isEmpty()) {

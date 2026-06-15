@@ -284,20 +284,35 @@ connectors:
 
 ### Links
 
-A link connects a port (written as `ComponentName.portName`) to a connector. Both ends of a communication channel need a link: one for the sending port and one for the receiving port.
+A link connects a port (written as `ComponentName.portName`) to a connector, with a flow direction. Both ends of a communication channel need a link: one for the sending port and one for the receiving port.
 
 ```yaml
 links:
   - port: Nginx.api_out
     connector: FE_to_BE
+    direction: out          # Nginx sends into FE_to_BE
   - port: SpringAPI.api_in
     connector: FE_to_BE
+    direction: in           # SpringAPI receives from FE_to_BE
 ```
 
 | Field | Required | Description |
 |---|---|---|
 | `port` | Yes | Reference to a port, written as `ComponentName.portName` |
 | `connector` | Yes | Name of the connector this port is wired to |
+| `direction` | No | Flow from the component's view: `out` (sends into connector), `in` (receives from connector), or `inout` (default, bidirectional) |
+
+#### Direction
+
+`direction` is component-centric and matches the usual port naming convention:
+
+- `out` -- the component **sends** through this port into the connector (e.g. `api_out`)
+- `in` -- the component **receives** from the connector through this port (e.g. `http_in`)
+- `inout` -- bidirectional; this is the **default** when `direction` is omitted
+
+So old files without `direction:` keep working (every link is treated as bidirectional). Validation rejects any value other than `in`, `out`, or `inout`. The HTML graph draws arrowheads to match (one arrow for `in`/`out`, both ends for `inout`), and each resolved rule's `paths` carry the direction so a generator can place directional controls.
+
+Referential integrity is enforced: a link whose `port` names a non-existent component/port, or whose `connector` is not declared, is a conformance error (the run fails) -- this prevents broken topology reaching a generator.
 
 #### Port reference format
 
@@ -667,6 +682,36 @@ Each security rule with the full component objects for every side embedded inlin
 ```
 
 A generator iterates `resolvedRules`, reads the rule `type`, then accesses `sctx`, `tctx`, and `actx` directly. No lookup into the `architecture` section required.
+
+#### paths
+
+When the source and target sides share a connector, the rule also carries a `paths` array: the concrete channel(s) the rule governs. This is what a generator places a control on.
+
+```json
+{
+  "type": "Confidentiality",
+  "sctx": [ { "name": "PatientDB", "type": "Data", ... } ],
+  "tctx": [ { "name": "SpringAPI", "type": "App", ... } ],
+  "paths": [
+    {
+      "connector": "BE_to_DB",
+      "sctxLinks": [ { "port": "PatientDB.db_in", "direction": "in" } ],
+      "tctxLinks": [ { "port": "SpringAPI.db_out", "direction": "out" } ]
+    }
+  ]
+}
+```
+
+How a generator uses it:
+
+| Rule | With `paths` |
+|---|---|
+| Confidentiality | enable TLS on each `path.connector` |
+| Integrity | integrity-checked channel on each `path.connector` (direction available on the links) |
+| Isolation | **empty `paths` = already isolated**; a non-empty `paths` is a contradiction (sides share a connector) |
+| Authentication | put an auth gate on the target-side ingress link of each path |
+
+`paths` is omitted when empty (the two sides share no connector, or the rule has no target side). Because link references are validated for integrity, a path never points at a non-existent port or connector.
 
 ### unresolved (only if non-empty)
 

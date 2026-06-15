@@ -1,10 +1,25 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>clinic-portal -- SAM4C Model Graph</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js"></script>
-<style>
+package sam4c.light.output;
+
+/**
+ * Shared presentation for the Cytoscape graph: CSS, the Cytoscape style array,
+ * and all interaction logic.
+ *
+ * Both the static file (HtmlReportGenerator) and the live web page (web/EditorPage)
+ * include these fragments, so the graph looks and behaves identically in both. The
+ * only difference between the two is how the graph data arrives: embedded inline in
+ * the file, fetched over HTTP in the web app. Both ultimately call initGraph().
+ */
+public final class GraphView {
+
+    private GraphView() {}
+
+    /** CDN script tag for Cytoscape.js. */
+    public static final String CDN =
+        "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js\"></script>";
+
+    /** Shared CSS (graph canvas, sidebar, panels, legend). */
+    public static String css() {
+        return """
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; display: flex; height: 100vh; }
 
@@ -43,12 +58,14 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; display:
 #controls { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 5; }
 .ctrl-btn { background: #1e1e2e; color: #cdd6f4; border: 1px solid #313244; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .ctrl-btn:hover { background: #313244; }
+""";
+    }
 
-</style>
-</head>
-<body>
+    /** The sidebar markup (view toggle, info, filters, coverage, warnings, legend). */
+    public static String sidebar(String title) {
+        return """
 <div id="sidebar">
-  <h1>&#9650; clinic-portal</h1>
+  <h1>&#9650; %s</h1>
 
   <h2>View</h2>
   <div id="view-panel">
@@ -82,15 +99,16 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; display:
     <div class="legend-item"><div class="legend-line" style="background:#455a64"></div>Architecture link</div>
   </div>
 </div>
+""".formatted(title);
+    }
 
-<div id="cy-container">
-  <div id="cy"></div>
-  <div id="controls">
-    <button class="ctrl-btn" onclick="fitGraph()">Fit</button>
-    <button class="ctrl-btn" onclick="relayout()">Re-layout</button>
-  </div>
-</div>
-<script>
+    /**
+     * Shared JavaScript: defines initGraph(elements, coverage, warnings) plus all
+     * interaction handlers. Wires the sidebar buttons once on load. Operates on a
+     * module-global `cy` so the control buttons and re-runs work consistently.
+     */
+    public static String script() {
+        return """
 let cy = null;
 let currentView = 'both';
 const activeFilters = new Set(['Confidentiality','Integrity','Isolation','Authentication']);
@@ -218,32 +236,6 @@ document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('cl
   else { activeFilters.add(rule); this.classList.remove('off'); }
   applyView();
 }));
-
-
-initGraph({ nodes: [{ "data": { "id":"n0", "label":"FrontendVM", "type":"VM", "attrs":"{Domain=frontend}", "ports":"", "bg":"#e8eaf6", "shape":"roundrectangle" } },
-{ "data": { "id":"n1", "label":"Nginx", "type":"App", "attrs":"{Domain=frontend}", "ports":"http_in, api_out", "bg":"#1565c0", "shape":"ellipse", "parent":"n0" } },
-{ "data": { "id":"n2", "label":"BackendVM", "type":"VM", "attrs":"{Domain=backend}", "ports":"", "bg":"#e8eaf6", "shape":"roundrectangle" } },
-{ "data": { "id":"n3", "label":"SpringAPI", "type":"App", "attrs":"{Domain=backend}", "ports":"api_in, db_out, admin_in", "bg":"#1565c0", "shape":"ellipse", "parent":"n2" } },
-{ "data": { "id":"n4", "label":"DatabaseVM", "type":"VM", "attrs":"{Domain=database}", "ports":"", "bg":"#e8eaf6", "shape":"roundrectangle" } },
-{ "data": { "id":"n5", "label":"PatientDB", "type":"Data", "attrs":"{Domain=database, DataClass=clinical}", "ports":"db_in", "bg":"#e65100", "shape":"barrel", "parent":"n4" } },
-{ "data": { "id":"n6", "label":"AdminVM", "type":"VM", "attrs":"{Domain=admin}", "ports":"", "bg":"#e8eaf6", "shape":"roundrectangle" } },
-{ "data": { "id":"n7", "label":"AdminDashboard", "type":"App", "attrs":"{Domain=admin, Role=administrator}", "ports":"mgmt_out", "bg":"#1565c0", "shape":"ellipse", "parent":"n6" } },
-{ "data": { "id":"conn_FE_to_BE", "label":"FE_to_BE", "type":"Connector", "attrs":"", "ports":"", "bg":"#78909c", "shape":"diamond" } },
-{ "data": { "id":"conn_BE_to_DB", "label":"BE_to_DB", "type":"Connector", "attrs":"", "ports":"", "bg":"#78909c", "shape":"diamond" } },
-{ "data": { "id":"conn_Admin_to_BE", "label":"Admin_to_BE", "type":"Connector", "attrs":"", "ports":"", "bg":"#78909c", "shape":"diamond" } },
-{ "data": { "id":"conn_Internet", "label":"Internet (external)", "type":"Connector", "attrs":"", "ports":"", "bg":"#546e7a", "shape":"diamond" } }], edges: [{ "data": { "id":"arch0", "source":"conn_Internet", "target":"n1", "label":"", "color":"#455a64", "style":"solid", "layer":"arch", "dir":"in" } },
-{ "data": { "id":"arch1", "source":"n1", "target":"conn_FE_to_BE", "label":"", "color":"#455a64", "style":"solid", "layer":"arch", "dir":"out" } },
-{ "data": { "id":"arch2", "source":"conn_FE_to_BE", "target":"n3", "label":"", "color":"#455a64", "style":"solid", "layer":"arch", "dir":"in" } },
-{ "data": { "id":"arch3", "source":"n3", "target":"conn_BE_to_DB", "label":"", "color":"#455a64", "style":"solid", "layer":"arch", "dir":"out" } },
-{ "data": { "id":"arch4", "source":"conn_BE_to_DB", "target":"n5", "label":"", "color":"#455a64", "style":"solid", "layer":"arch", "dir":"in" } },
-{ "data": { "id":"arch5", "source":"n7", "target":"conn_Admin_to_BE", "label":"", "color":"#455a64", "style":"solid", "layer":"arch", "dir":"out" } },
-{ "data": { "id":"arch6", "source":"conn_Admin_to_BE", "target":"n3", "label":"", "color":"#455a64", "style":"solid", "layer":"arch", "dir":"in" } },
-{ "data": { "id":"e0", "source":"n5", "target":"n3", "label":"Confidentiality", "color":"#1565c0", "style":"solid", "layer":"rule", "sctxAll":"DatabaseVM, PatientDB", "tctxAll":"BackendVM, SpringAPI", "actxAll":"" } },
-{ "data": { "id":"e1", "source":"n3", "target":"n5", "label":"Integrity", "color":"#2e7d32", "style":"solid", "layer":"rule", "sctxAll":"BackendVM, SpringAPI", "tctxAll":"DatabaseVM, PatientDB", "actxAll":"" } },
-{ "data": { "id":"e2", "source":"n7", "target":"n3", "label":"Authentication", "color":"#6a1b9a", "style":"solid", "layer":"rule", "sctxAll":"AdminDashboard", "tctxAll":"BackendVM, SpringAPI", "actxAll":"AdminVM, AdminDashboard" } },
-{ "data": { "id":"e3", "source":"n5", "target":"n1", "label":"Isolation", "color":"#c62828", "style":"dashed", "layer":"rule", "sctxAll":"DatabaseVM, PatientDB", "tctxAll":"FrontendVM, Nginx", "actxAll":"" } },
-{ "data": { "id":"e4", "source":"n7", "target":"n1", "label":"Isolation", "color":"#c62828", "style":"dashed", "layer":"rule", "sctxAll":"AdminVM, AdminDashboard", "tctxAll":"FrontendVM, Nginx", "actxAll":"" } },
-{ "data": { "id":"e5", "source":"n5", "target":"n3", "label":"Confidentiality", "color":"#1565c0", "style":"solid", "layer":"rule", "sctxAll":"PatientDB", "tctxAll":"BackendVM, SpringAPI", "actxAll":"" } }] }, {"frontendCtx": ["FrontendVM", "Nginx"], "backendCtx": ["BackendVM", "SpringAPI"], "dbCtx": ["DatabaseVM", "PatientDB"], "adminCtx": ["AdminVM", "AdminDashboard"], "adminRoleCtx": ["AdminDashboard"], "clinicalDataCtx": ["PatientDB"], "piiCtx": []}, ['Confidentiality: sctx resolves to no components -- unused rule, or a missing/mistyped tag', 'context \'piiCtx\' matches no components -- predicate satisfied by nothing in the architecture']);
-</script>
-</body>
-</html>
+""";
+    }
+}

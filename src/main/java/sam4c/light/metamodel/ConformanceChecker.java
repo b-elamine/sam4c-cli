@@ -34,20 +34,56 @@ public class ConformanceChecker {
             errors.addAll(checkComponent(c, "Architecture.components"));
 
         // M2: Architecture -> connectors [0..*] containment
+        java.util.Set<String> connectorNames = new java.util.HashSet<>();
         for (Connector c : arch.connectors()) {
             if (blank(c.name()))
                 errors.add("Connector: name is required (M2: Connector.name [1..1])");
+            else connectorNames.add(c.name());
         }
 
-        // M2: Architecture -> links [0..*] containment
+        // Referential integrity: collect every component name and its ports so we
+        // can verify links point at things that actually exist. A dangling link
+        // (typo'd port or connector) would otherwise survive to generation and
+        // produce a broken or phantom deployment artifact.
+        java.util.Map<String, java.util.Set<String>> componentPorts = new java.util.HashMap<>();
+        collectPorts(arch.components(), componentPorts);
+
+        // M2: Architecture -> links [0..*] containment + referential integrity
         for (Link l : arch.links()) {
-            if (blank(l.portRef()))
+            if (blank(l.portRef())) {
                 errors.add("Link: portRef is required (M2: Link.portRef [1..1])");
+            } else {
+                // portRef is "Component.port" (or a bare "Component")
+                int dot = l.portRef().indexOf('.');
+                String comp = dot < 0 ? l.portRef() : l.portRef().substring(0, dot);
+                String port = dot < 0 ? null : l.portRef().substring(dot + 1);
+                if (!componentPorts.containsKey(comp))
+                    errors.add("Link.portRef '" + l.portRef()
+                            + "' references unknown component '" + comp + "'");
+                else if (port != null && !componentPorts.get(comp).contains(port))
+                    errors.add("Link.portRef '" + l.portRef()
+                            + "': component '" + comp + "' has no port '" + port + "'");
+            }
+
             if (blank(l.connectorName()))
                 errors.add("Link: connectorName is required (M2: Link.connectorName [1..1])");
+            else if (!connectorNames.contains(l.connectorName()))
+                errors.add("Link.connectorName '" + l.connectorName()
+                        + "' is not a declared connector");
         }
 
         return errors;
+    }
+
+    /** Recursively collect each component's name -> set of its port names. */
+    private void collectPorts(List<Component> components,
+                              java.util.Map<String, java.util.Set<String>> out) {
+        for (Component c : components) {
+            java.util.Set<String> ports = new java.util.HashSet<>();
+            for (Port p : c.ports()) ports.add(p.name());
+            out.put(c.name(), ports);
+            if (!c.children().isEmpty()) collectPorts(c.children(), out);
+        }
     }
 
     public List<String> check(SecurityModel sec) {
