@@ -124,11 +124,12 @@ const elements = {
 { data: { id:'arch_PatientDB_BE_to_DB', source:'n5', target:'conn_BE_to_DB', label:'', color:'#455a64', style:'solid', layer:'arch' } },
 { data: { id:'arch_AdminDashboard_Admin_to_BE', source:'n7', target:'conn_Admin_to_BE', label:'', color:'#455a64', style:'solid', layer:'arch' } },
 { data: { id:'arch_SpringAPI_Admin_to_BE', source:'n3', target:'conn_Admin_to_BE', label:'', color:'#455a64', style:'solid', layer:'arch' } },
-{ data: { id:'e0', source:'n5', target:'n3', label:'Confidentiality', color:'#1565c0', style:'solid', layer:'rule' } },
-{ data: { id:'e1', source:'n3', target:'n5', label:'Integrity', color:'#2e7d32', style:'solid', layer:'rule' } },
-{ data: { id:'e2', source:'n7', target:'n3', label:'Authentication', color:'#6a1b9a', style:'solid', layer:'rule' } },
-{ data: { id:'e3', source:'n5', target:'n1', label:'Isolation', color:'#c62828', style:'dashed', layer:'rule' } },
-{ data: { id:'e4', source:'n7', target:'n1', label:'Isolation', color:'#c62828', style:'dashed', layer:'rule' } } ]
+{ data: { id:'e0', source:'n5', target:'n3', label:'Confidentiality', color:'#1565c0', style:'solid', layer:'rule', sctxAll:'DatabaseVM, PatientDB', tctxAll:'BackendVM, SpringAPI', actxAll:'' } },
+{ data: { id:'e1', source:'n3', target:'n5', label:'Integrity', color:'#2e7d32', style:'solid', layer:'rule', sctxAll:'BackendVM, SpringAPI', tctxAll:'DatabaseVM, PatientDB', actxAll:'' } },
+{ data: { id:'e2', source:'n7', target:'n3', label:'Authentication', color:'#6a1b9a', style:'solid', layer:'rule', sctxAll:'AdminDashboard', tctxAll:'BackendVM, SpringAPI', actxAll:'AdminVM, AdminDashboard' } },
+{ data: { id:'e3', source:'n5', target:'n1', label:'Isolation', color:'#c62828', style:'dashed', layer:'rule', sctxAll:'DatabaseVM, PatientDB', tctxAll:'FrontendVM, Nginx', actxAll:'' } },
+{ data: { id:'e4', source:'n7', target:'n1', label:'Isolation', color:'#c62828', style:'dashed', layer:'rule', sctxAll:'AdminVM, AdminDashboard', tctxAll:'FrontendVM, Nginx', actxAll:'' } },
+{ data: { id:'e5', source:'n5', target:'n3', label:'Confidentiality', color:'#1565c0', style:'solid', layer:'rule', sctxAll:'PatientDB', tctxAll:'BackendVM, SpringAPI', actxAll:'' } } ]
 };
 
 const cy = cytoscape({
@@ -196,7 +197,9 @@ const cy = cytoscape({
         'text-background-color': '#fff',
         'text-background-opacity': 0.9,
         'text-background-padding': '2px',
+        'text-rotation': 'autorotate',
         'curve-style': 'bezier',
+        'control-point-step-size': 60,
         'width': 2
       }
     },
@@ -245,11 +248,23 @@ cy.on('tap', 'edge', function(e) {
   e.target.target().addClass('highlighted');
   cy.elements().not(e.target).not(e.target.source()).not(e.target.target()).addClass('faded');
 
-  const label = d.label || 'Architecture link';
-  document.getElementById('info-panel').innerHTML =
-    '<div id="info-name">' + label + '</div>' +
-    '<div id="info-type">' + e.target.source().data('label') +
-    ' \u2192 ' + e.target.target().data('label') + '</div>';
+  if (d.layer === 'rule') {
+    // Security rule edge: show the FULL resolved rule, all arguments
+    let html = '<div id="info-name">' + d.label + '</div>';
+    html += '<div id="info-attrs">sctx = [' + (d.sctxAll || '') + ']</div>';
+    if (d.tctxAll) html += '<div id="info-attrs">tctx = [' + d.tctxAll + ']</div>';
+    if (d.actxAll) html += '<div id="info-attrs">actx = [' + d.actxAll + ']</div>';
+    html += '<div id="info-ports" style="margin-top:6px">this edge: ' +
+            e.target.source().data('label') + ' \u2192 ' +
+            e.target.target().data('label') + '</div>';
+    document.getElementById('info-panel').innerHTML = html;
+  } else {
+    // Architecture link
+    document.getElementById('info-panel').innerHTML =
+      '<div id="info-name">Architecture link</div>' +
+      '<div id="info-type">' + e.target.source().data('label') +
+      ' \u2192 ' + e.target.target().data('label') + '</div>';
+  }
 });
 
 // Click background -- reset
