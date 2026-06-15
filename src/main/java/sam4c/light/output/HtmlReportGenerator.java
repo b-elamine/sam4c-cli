@@ -76,13 +76,23 @@ public class HtmlReportGenerator {
         // Build security edges by traversing resolved rules using real object references.
         // Only leaf components (non-VM) appear as endpoints; VM containers are shown as
         // compound parent nodes, so leaf-to-leaf edges keep the graph readable.
+        //
+        // No cross-rule dedup: two different rules can resolve to the same component
+        // pair (e.g. Confidentiality(dbCtx,...) and Confidentiality(clinicalDataCtx,...)
+        // both land on PatientDB -> SpringAPI). They are distinct rules and each gets
+        // its own edge. Cytoscape bows coincident edges apart so both stay visible.
         int edgeSeq = 0;
-        Set<String> edgeSeen = new LinkedHashSet<>();
 
         for (ResolvedRule rr : model.resolvedRules()) {
             String ruleType = rr.rule().getClass().getSimpleName();
             String color    = edgeColor(rr.rule());
             String style    = edgeStyle(rr.rule());
+
+            // Pre-compute the FULL resolved rule -- every component in each argument.
+            // Embedded on each edge so clicking shows the whole rule, not just the pair.
+            String sctxAll = names(rr.sctxComponents());
+            String tctxAll = names(rr.tctxComponents());
+            String actxAll = names(rr.actxComponents());
 
             for (Component from : rr.sctxComponents()) {
                 if (isContainer(from)) continue;
@@ -95,13 +105,12 @@ public class HtmlReportGenerator {
                     String toId   = nodeIds.get(to);
                     if (fromId == null || toId == null) continue;
 
-                    String edgeKey = fromId + ":" + toId + ":" + ruleType;
-                    if (!edgeSeen.add(edgeKey)) continue;
-
                     cyEdges.add(String.format(
                         "{ data: { id:'e%d', source:'%s', target:'%s', " +
-                        "label:'%s', color:'%s', style:'%s', layer:'rule' } }",
-                        edgeSeq++, fromId, toId, ruleType, color, style
+                        "label:'%s', color:'%s', style:'%s', layer:'rule', " +
+                        "sctxAll:'%s', tctxAll:'%s', actxAll:'%s' } }",
+                        edgeSeq++, fromId, toId, ruleType, color, style,
+                        escape(sctxAll), escape(tctxAll), escape(actxAll)
                     ));
                 }
             }
@@ -204,6 +213,12 @@ public class HtmlReportGenerator {
     private static String escape(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
+    }
+
+    /** Join component names for display, e.g. "AdminVM, AdminDashboard". */
+    private static String names(List<Component> comps) {
+        return comps.stream().map(Component::name)
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     // -------------------------------------------------------------------------
@@ -388,7 +403,9 @@ const cy = cytoscape({
         'text-background-color': '#fff',
         'text-background-opacity': 0.9,
         'text-background-padding': '2px',
+        'text-rotation': 'autorotate',
         'curve-style': 'bezier',
+        'control-point-step-size': 60,
         'width': 2
       }
     },
@@ -437,11 +454,23 @@ cy.on('tap', 'edge', function(e) {
   e.target.target().addClass('highlighted');
   cy.elements().not(e.target).not(e.target.source()).not(e.target.target()).addClass('faded');
 
-  const label = d.label || 'Architecture link';
-  document.getElementById('info-panel').innerHTML =
-    '<div id="info-name">' + label + '</div>' +
-    '<div id="info-type">' + e.target.source().data('label') +
-    ' \\u2192 ' + e.target.target().data('label') + '</div>';
+  if (d.layer === 'rule') {
+    // Security rule edge: show the FULL resolved rule, all arguments
+    let html = '<div id="info-name">' + d.label + '</div>';
+    html += '<div id="info-attrs">sctx = [' + (d.sctxAll || '') + ']</div>';
+    if (d.tctxAll) html += '<div id="info-attrs">tctx = [' + d.tctxAll + ']</div>';
+    if (d.actxAll) html += '<div id="info-attrs">actx = [' + d.actxAll + ']</div>';
+    html += '<div id="info-ports" style="margin-top:6px">this edge: ' +
+            e.target.source().data('label') + ' \\u2192 ' +
+            e.target.target().data('label') + '</div>';
+    document.getElementById('info-panel').innerHTML = html;
+  } else {
+    // Architecture link
+    document.getElementById('info-panel').innerHTML =
+      '<div id="info-name">Architecture link</div>' +
+      '<div id="info-type">' + e.target.source().data('label') +
+      ' \\u2192 ' + e.target.target().data('label') + '</div>';
+  }
 });
 
 // Click background -- reset

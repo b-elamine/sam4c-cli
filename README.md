@@ -23,6 +23,16 @@ Run on the included example:
 java -jar target/sam4c-cli.jar examples/clinic.arch.yaml examples/clinic.secdsl
 ```
 
+Generate an interactive HTML graph alongside the JSON:
+```bash
+java -jar target/sam4c-cli.jar examples/clinic.arch.yaml examples/clinic.secdsl --html
+```
+
+Generate a starter security model from an architecture's attributes:
+```bash
+java -jar target/sam4c-cli.jar examples/clinic.arch.yaml --init-secdsl
+```
+
 See the full object graph (what each rule actually points to):
 ```bash
 java -jar target/sam4c-cli.jar examples/clinic.arch.yaml examples/clinic.secdsl --inspect
@@ -38,6 +48,9 @@ Validate without writing output (for CI):
 java -jar target/sam4c-cli.jar examples/clinic.arch.yaml examples/clinic.secdsl --validate
 echo $?  # 0 = clean, 1 = problems
 ```
+
+A configured `s4c` alias (see `~/.zshrc`) lets you shorten all of these to
+`s4c <arch> <rules> [options]`.
 
 ---
 
@@ -102,3 +115,8 @@ A `.sam4c.json` file with four sections:
 - `security` -- attributes, contexts, and rules as parsed from the DSL (with type names)
 - `coverage` -- for each named context, the full component objects that matched its predicate
 - `resolvedRules` -- each rule with the full component objects for sctx, tctx, and actx embedded inline
+
+With `--html`, a `.sam4c.html` file is also written: a self-contained interactive
+graph (Cytoscape.js) showing components, connectors, the architecture topology, and
+the security rules as edges. Toggle between Architecture / Security / Both views, and
+click any node or rule edge to inspect its resolved arguments.

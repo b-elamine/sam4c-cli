@@ -1,6 +1,6 @@
-# s4cLight User Guide
+# sam4c-cli User Guide
 
-s4cLight takes two input files -- an architecture description and a set of security rules -- and merges them into a single unified model. That unified model is the starting point for any downstream work such as validation, IaC generation, or compliance checking.
+sam4c-cli takes two input files -- an architecture description and a set of security rules -- and merges them into a single unified model. That unified model is the starting point for any downstream work such as validation, IaC generation, or compliance checking.
 
 ---
 
@@ -11,6 +11,7 @@ s4cLight takes two input files -- an architecture description and a set of secur
 3. [Writing the architecture file](#3-writing-the-architecture-file)
 4. [Writing the security rules file](#4-writing-the-security-rules-file)
 5. [Understanding the output](#5-understanding-the-output)
+5b. [Generating a starter security model](#5b-generating-a-starter-security-model---init-secdsl)
 6. [Extending the tool](#6-extending-the-tool)
 7. [Error messages](#7-error-messages)
 
@@ -40,8 +41,12 @@ alias s4c="java -jar ~/bin/sam4c-cli.jar"
 
 ```
 sam4c-cli <arch-file> <rules-file> [options]
+sam4c-cli <arch-file> --init-secdsl
 sam4c-cli --metamodel
 ```
+
+If the `s4c` alias is configured (see the project README), `s4c` can replace
+`java -jar sam4c-cli.jar` in every command below.
 
 ### Arguments
 
@@ -54,7 +59,9 @@ sam4c-cli --metamodel
 
 | Option | Description |
 |---|---|
-| `-o <file>` / `--output <file>` | Where to write the output JSON. Defaults to `<arch-name>.sam4c.json` in the same directory as the arch file |
+| `-o <file>` / `--output <file>` | Where to write output. For the merge it is the JSON path (default `<arch-name>.sam4c.json`); with `--init-secdsl` it is the `.secdsl` path |
+| `--html` | Also write a self-contained interactive HTML graph (`<arch-name>.sam4c.html`) next to the JSON |
+| `--init-secdsl` | Generate a starter `.secdsl` from the architecture's attributes and exit. Needs only the arch file; refuses to overwrite an existing file |
 | `--metamodel` | Print the full M2 metamodel definition (all three sub-packages: core, architecture, security) and exit. No input files required |
 | `--inspect` | Print a full object-graph traversal: every rule with its fully resolved component objects, their types, attributes, ports, and children. Use this to verify the merge is correct before running a generator |
 | `--validate` | Run the merge and print the resolution report, but do not write any output file. Exit code is 0 if all references resolved, 1 if any are unresolved |
@@ -82,6 +89,18 @@ echo $?   # 0 = all resolved, 1 = unresolved references
 Inspect the full object graph traversal:
 ```bash
 java -jar sam4c-cli.jar clinic.arch.yaml clinic.secdsl --inspect
+```
+
+Merge and also write the interactive HTML graph:
+```bash
+java -jar sam4c-cli.jar clinic.arch.yaml clinic.secdsl --html
+# writes clinic.sam4c.json and clinic.sam4c.html
+```
+
+Generate a starter security model from the architecture (no rules file needed):
+```bash
+java -jar sam4c-cli.jar clinic.arch.yaml --init-secdsl
+# writes clinic.secdsl with #attribute and #context declarations derived from the arch
 ```
 
 Print the M2 metamodel (no input files needed):
@@ -658,6 +677,51 @@ A list of names that appeared in the security rules but could not be matched to 
 ```
 
 When this field appears, the tool exits with code 1. Fix the names in the `.secdsl` file or add the missing components to the `.arch.yaml` file.
+
+### HTML graph (`--html`)
+
+With `--html`, a `<arch-name>.sam4c.html` file is written next to the JSON. It is a
+single self-contained file (Cytoscape.js loaded from a CDN) that opens in any browser.
+
+It is generated directly from the in-memory unified model -- the same resolved
+`Component` references the JSON is built from -- so the graph is a faithful view of the
+object graph, not a re-parse of the JSON.
+
+What it shows:
+
+- **Nodes**: components (VMs as compound containers around their children) and connectors
+- **Architecture edges** (gray): the topology -- components wired to connectors via links
+- **Security edges** (coloured): one per resolved rule pair, coloured by rule type
+  (Confidentiality blue, Integrity green, Isolation red dashed, Authentication purple)
+
+Interaction:
+
+- **View toggle**: Architecture / Security / Both
+- **Filter** by rule type
+- **Click a node**: shows its type, attributes, and ports
+- **Click a security edge**: shows the full resolved rule (all sctx / tctx / actx components)
+- **Coverage panel**: for each context, the components it matched
+
+---
+
+## 5b. Generating a starter security model (`--init-secdsl`)
+
+Run with only the architecture file and `--init-secdsl` to scaffold a `.secdsl`:
+
+```bash
+java -jar sam4c-cli.jar clinic.arch.yaml --init-secdsl
+```
+
+It scans every component (recursively) and emits:
+
+- one `#attribute` declaration per attribute key, listing every value found in the arch
+- one `#context` per `key=value` pair, named `<value>Ctx`
+- commented-out templates of the four property types for you to fill in
+
+It only emits what the architecture actually contains -- attribute values that no
+component carries are not generated. It never invents security rules (those require
+human intent), and it refuses to overwrite an existing file. Use `-o <file>` to write
+elsewhere.
 
 ---
 

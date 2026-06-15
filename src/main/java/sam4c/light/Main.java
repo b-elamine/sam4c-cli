@@ -7,6 +7,7 @@ import picocli.CommandLine.Parameters;
 import sam4c.light.loader.ArchLoader;
 import sam4c.light.loader.DslParser;
 import sam4c.light.merger.ModelMerger;
+import sam4c.light.merger.SemanticValidator;
 import sam4c.light.model.Architecture;
 import sam4c.light.model.SecurityModel;
 import sam4c.light.model.UnifiedModel;
@@ -17,6 +18,7 @@ import sam4c.light.metamodel.Sam4cMetamodel;
 import sam4c.light.output.HtmlReportGenerator;
 import sam4c.light.output.ModelInspector;
 import sam4c.light.output.ModelSerializer;
+import sam4c.light.output.SecDslScaffolder;
 import sam4c.light.registry.ComponentRegistry;
 import sam4c.light.registry.PropertyRegistry;
 
@@ -53,10 +55,34 @@ public class Main implements Callable<Integer> {
     @Option(names = {"--html"}, description = "Generate an interactive HTML graph from the in-memory object graph")
     private boolean generateHtml;
 
+    @Option(names = {"--init-secdsl"}, description = "Generate a starter .secdsl file from the architecture's attributes and exit")
+    private boolean initSecdsl;
+
     @Override
     public Integer call() {
         try {
             if (printMetamodel) { printMetamodel(); return 0; }
+
+            if (initSecdsl) {
+                if (archFile == null) {
+                    System.err.println("Usage: s4clight <arch.yaml> --init-secdsl");
+                    return 1;
+                }
+                if (!archFile.exists()) { System.err.println("Architecture file not found: " + archFile); return 1; }
+
+                Architecture arch = new ArchLoader(ComponentRegistry.withDefaults()).load(archFile);
+                File secOut = output != null ? output
+                        : new File(archFile.getParent(),
+                                   archFile.getName().replaceAll("\\.arch\\.yaml$|\\.yaml$", "") + ".secdsl");
+                if (secOut.exists()) {
+                    System.err.println("Refusing to overwrite existing file: " + secOut);
+                    System.err.println("Delete it first or pass -o <file> to write elsewhere.");
+                    return 1;
+                }
+                SecDslScaffolder.write(arch, secOut);
+                System.out.println("Wrote starter security model to: " + secOut);
+                return 0;
+            }
 
             if (archFile == null || rulesFile == null) {
                 System.err.println("Usage: s4clight <arch.yaml> <rules.secdsl> [options]");
@@ -93,6 +119,13 @@ public class Main implements Callable<Integer> {
                 ModelInspector.inspect(unified);
             } else {
                 printReport(unified);
+            }
+
+            // Semantic validation: rules/contexts that resolve to nothing
+            List<String> warnings = SemanticValidator.validate(unified);
+            if (!warnings.isEmpty()) {
+                System.out.println("\n-- Semantic warnings --");
+                warnings.forEach(w -> System.out.println("  ! " + w));
             }
 
             if (!unified.unresolved().isEmpty()) {
