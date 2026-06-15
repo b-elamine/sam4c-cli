@@ -31,40 +31,47 @@ public final class StudioPage {
     private static final String CDN_LINE = "{{CDN}}";
 
     private static final String STUDIO_CSS = """
-#topnav { position: fixed; top: 0; left: 0; right: 0; height: 46px; background: #181825; border-bottom: 1px solid #313244; display: flex; align-items: center; gap: 4px; padding: 0 14px; z-index: 50; }
-#topnav .brand { color: #cba6f7; font-weight: bold; font-size: 14px; margin-right: 16px; }
-#topnav .nav-btn { background: #1e1e2e; color: #cdd6f4; border: 1px solid #313244; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-#topnav .nav-btn.active { background: #3949ab; color: #fff; border-color: #1565c0; }
-.stage { position: fixed; top: 46px; left: 0; right: 0; bottom: 0; display: none; }
+/* Clean Light theme -- inherits --bg/--surface/--border/--text/--muted/--accent from GraphView */
+#topnav { position: fixed; top: 0; left: 0; right: 0; height: 50px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; padding: 0 16px; z-index: 50; box-shadow: 0 1px 3px rgba(0,0,0,.03); }
+#topnav .brand { color: var(--text); font-weight: 700; font-size: 14px; margin-right: 20px; letter-spacing: -0.2px; }
+#topnav .nav-btn { background: var(--surface); color: var(--muted); border: 1px solid transparent; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all .12s; }
+#topnav .nav-btn:hover { color: var(--text); background: var(--bg); }
+#topnav .nav-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--border); }
+.stage { position: fixed; top: 50px; left: 0; right: 0; bottom: 0; display: none; }
 .stage.active { display: flex; }
 
 /* Stage 1: design */
-#palette { width: 170px; background: #11111b; border-right: 1px solid #313244; padding: 12px; }
-#palette h3 { font-size: 11px; text-transform: uppercase; color: #6c7086; margin-bottom: 8px; }
-.pal-item { display: block; width: 100%; text-align: left; margin: 4px 0; padding: 8px 10px; border-radius: 6px; border: 1px solid #45475a; background: #1e1e2e; color: #cdd6f4; cursor: pointer; font-size: 12px; }
-.pal-item:hover { background: #313244; }
-#cy-edit { flex: 1; background: #fafafa; }
-#props { width: 280px; background: #1e1e2e; color: #cdd6f4; border-left: 1px solid #313244; padding: 14px; overflow-y: auto; }
-#props h3 { font-size: 11px; text-transform: uppercase; color: #6c7086; margin-bottom: 10px; }
-#props label { display: block; font-size: 11px; color: #89dceb; margin: 8px 0 3px; }
-#props input { width: 100%; background: #11111b; color: #cdd6f4; border: 1px solid #313244; border-radius: 4px; padding: 6px; font-size: 12px; }
-#props .req { color: #f9e2af; }
-#design-actions { position: fixed; bottom: 0; left: 170px; right: 280px; padding: 10px; background: #181825; border-top: 1px solid #313244; text-align: center; }
-.act-btn { background: #3949ab; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; margin: 0 4px; }
-.act-btn.secondary { background: #313244; }
-#design-msg { font-size: 11px; margin-left: 10px; }
-#design-msg.error { color: #f38ba8; }
-#design-msg.ok { color: #a6e3a1; }
+#palette { width: 184px; background: var(--surface); border-right: 1px solid var(--border); padding: 14px; overflow-y: auto; }
+#palette h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 8px; }
+.pal-item { display: block; width: 100%; text-align: left; margin: 5px 0; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 500; transition: all .12s; }
+.pal-item:hover { border-color: var(--accent); color: var(--accent); }
+#cy-edit { flex: 1; background: #fafbfc; }
+#props { width: 296px; background: var(--surface); color: var(--text); border-left: 1px solid var(--border); padding: 16px; overflow-y: auto; }
+#props h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 10px; }
+#props label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); margin: 10px 0 3px; }
+#props input, #props select { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 7px 8px; font-size: 12px; font-family: inherit; }
+#props input:focus, #props select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+#props .req { color: var(--warn); font-weight: 600; }
+#design-actions { position: fixed; bottom: 0; left: 184px; right: 296px; padding: 12px; background: var(--surface); border-top: 1px solid var(--border); text-align: center; }
+.act-btn { background: var(--accent); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; margin: 0 4px; transition: all .12s; }
+.act-btn:hover { filter: brightness(1.08); }
+.act-btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); }
+.act-btn.secondary:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+#design-msg { font-size: 11.5px; margin-left: 10px; color: var(--muted); }
+#design-msg.error { color: var(--danger); }
+#design-msg.ok { color: var(--ok); }
 
 /* Stage 2: files */
-#files { flex: 1; display: flex; flex-direction: column; }
+#files { flex: 1; display: flex; flex-direction: column; background: var(--bg); }
 #files-cols { flex: 1; display: flex; }
-.file-col { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #313244; background: #11111b; }
-.file-col h3 { font-size: 11px; text-transform: uppercase; color: #6c7086; padding: 10px 14px 4px; }
-.file-col textarea { flex: 1; margin: 0 14px; background: #1e1e2e; color: #cdd6f4; border: 1px solid #313244; border-radius: 6px; padding: 10px; font-family: Consolas, monospace; font-size: 12px; resize: none; }
+.file-col { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface); }
+.file-col:last-child { border-right: none; }
+.file-col h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); padding: 12px 14px 6px; }
+.file-col textarea { flex: 1; margin: 0 14px; background: #fbfbfd; color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px; font-family: 'SF Mono', 'JetBrains Mono', Consolas, monospace; font-size: 12.5px; line-height: 1.6; resize: none; }
+.file-col textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .file-bar { padding: 10px 14px; display: flex; gap: 8px; }
 .file-bar .act-btn { font-size: 12px; padding: 6px 12px; }
-#files-footer { padding: 12px; background: #181825; border-top: 1px solid #313244; text-align: center; }
+#files-footer { padding: 14px; background: var(--surface); border-top: 1px solid var(--border); text-align: center; }
 
 /* Stage 3: result reuses GraphView sidebar + #cy */
 #result { flex: 1; display: flex; }
@@ -92,11 +99,11 @@ let linkSource = null;
 
 function editorStyle() {
   return [
-    { selector: 'node', style: { 'label':'data(name)', 'background-color':'data(bg)', 'shape':'data(shape)', 'color':'#fff', 'font-size':'11px', 'text-valign':'center', 'text-halign':'center', 'text-wrap':'wrap', 'border-width':1, 'border-color':'#555', 'padding':'10px' } },
-    { selector: 'node[kind = "VM"]', style: { 'background-color':'#e8eaf6', 'color':'#1a237e', 'font-weight':'bold', 'text-valign':'top', 'border-color':'#3949ab', 'border-width':2, 'padding':'22px' } },
-    { selector: 'node[kind = "Connector"]', style: { 'shape':'diamond', 'background-color':'#78909c', 'width':'34px', 'height':'34px', 'font-size':'9px' } },
+    { selector: 'node', style: { 'label':'data(name)', 'background-color':'data(bg)', 'shape':'data(shape)', 'color':'#ffffff', 'font-size':'10px', 'font-weight':500, 'text-valign':'center', 'text-halign':'center', 'text-wrap':'wrap', 'text-max-width':'90px', 'text-background-color':'#0f172a', 'text-background-opacity':0.6, 'text-background-padding':'3px', 'text-background-shape':'roundrectangle', 'border-width':1, 'border-color':'rgba(15,23,42,0.15)', 'padding':'10px', 'z-index':30 } },
+    { selector: 'node[kind = "VM"]', style: { 'background-color':'#eef2ff', 'font-weight':600, 'text-valign':'top', 'text-margin-y':2, 'border-color':'#c7d2fe', 'border-width':1.5, 'padding':'20px' } },
+    { selector: 'node[kind = "Connector"]', style: { 'shape':'diamond', 'background-color':'#64748b', 'width':'34px', 'height':'34px', 'font-size':'9px' } },
     { selector: ':parent', style: { 'background-opacity':0.15 } },
-    { selector: 'edge', style: { 'line-color':'#455a64', 'target-arrow-color':'#455a64', 'source-arrow-color':'#455a64', 'target-arrow-shape':'triangle', 'curve-style':'bezier', 'width':2, 'label':'data(port)', 'font-size':'9px', 'color':'#333', 'text-background-color':'#fff', 'text-background-opacity':0.9 } },
+    { selector: 'edge', style: { 'line-color':'#455a64', 'target-arrow-color':'#455a64', 'source-arrow-color':'#455a64', 'target-arrow-shape':'triangle', 'curve-style':'bezier', 'width':2, 'label':'data(port)', 'font-size':'9px', 'color':'#333', 'text-background-color':'#fff', 'text-background-opacity':0.9, 'z-index':1 } },
     { selector: 'edge[dir = "inout"]', style: { 'source-arrow-shape':'triangle' } },
     { selector: 'node:selected', style: { 'border-color':'#f9a825', 'border-width':4 } },
     { selector: 'edge:selected', style: { 'line-color':'#f9a825', 'target-arrow-color':'#f9a825', 'width':3 } },
@@ -276,8 +283,11 @@ function deleteNode() { if (selectedId) { editorCy.remove(editorCy.getElementByI
 function toggleLinkMode() {
   linkMode = !linkMode;
   linkSource = null;
-  document.getElementById('link-btn').textContent = linkMode ? 'Linking: pick component, then connector (click to cancel)' : 'Draw link';
-  document.getElementById('link-btn').style.background = linkMode ? '#1565c0' : '';
+  const b = document.getElementById('link-btn');
+  b.textContent = linkMode ? 'Linking: pick one end, then the other (click to cancel)' : 'Draw link';
+  b.style.background = linkMode ? 'var(--accent)' : '';
+  b.style.color = linkMode ? '#fff' : '';
+  b.style.borderColor = linkMode ? 'var(--accent)' : '';
 }
 
 function handleLinkClick(node) {
@@ -440,8 +450,8 @@ window.addEventListener('load', initEditor);
     <h3 style="margin-top:16px">Edit</h3>
     <button class="pal-item" onclick="selectAllNodes()">Select all (Ctrl+A)</button>
     <button class="pal-item" onclick="duplicateSelected()">Duplicate (Ctrl+D)</button>
-    <button class="pal-item" onclick="deleteSelected()" style="border-color:#f38ba8;color:#f38ba8">Delete selected (Del)</button>
-    <p style="font-size:10px;color:#6c7086;margin-top:8px;line-height:1.4">Drag on empty canvas to box-select. Shift-click to add to selection.</p>
+    <button class="pal-item" onclick="deleteSelected()" style="border-color:var(--danger);color:var(--danger)">Delete selected (Del)</button>
+    <p style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.4">Drag on empty canvas to box-select. Shift-click to add to selection.</p>
   </div>
   <div id="cy-edit"></div>
   <div id="props">
