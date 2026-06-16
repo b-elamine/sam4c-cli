@@ -308,10 +308,21 @@ function handleLinkClick(node) {
   else { setMsg('A link must connect a component and a connector (one of each).', 'error'); return; }
   if (comp.data('kind') === 'VM') { setMsg('Pick an App/Data component, not a VM.', 'error'); return; }
 
-  const ports = comp.data('ports') || [];
-  let port = ports.length ? ports[0] : '';
-  if (ports.length > 1) { const p = prompt('Which port of ' + comp.data('name') + '? (' + ports.join(', ') + ')', ports[0]); if (p) port = p; }
-  const portRef = comp.data('name') + (port ? '.' + port : '');
+  // A link must attach to a PORT of the component (portRef = "Component.port").
+  // If the component has no ports yet, create one here so the edge isn't labelled
+  // with just the component name; if it has several, ask which.
+  let ports = comp.data('ports') || [];
+  let port;
+  if (ports.length === 0) {
+    port = (prompt('Name a port on "' + comp.data('name') + '" for this link:', 'p1') || '').trim();
+    if (!port) { setMsg('Link cancelled -- a port name is required.', 'error'); linkSource.removeClass('sel'); linkSource = null; return; }
+    comp.data('ports', ports.concat([port]));   // add the new port to the component
+  } else if (ports.length === 1) {
+    port = ports[0];
+  } else {
+    port = (prompt('Which port of "' + comp.data('name') + '"? (' + ports.join(', ') + ')', ports[0]) || ports[0]).trim();
+  }
+  const portRef = comp.data('name') + '.' + port;
 
   // Flow direction (component's perspective): out, in, or inout
   let dir = (prompt('Direction? out = component sends, in = component receives, inout = both', 'inout') || 'inout').trim().toLowerCase();

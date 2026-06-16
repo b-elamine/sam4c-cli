@@ -138,7 +138,7 @@ function cyStyle() {
     { selector: 'node[type = "Connector"]', style: { 'background-color':'data(bg)', 'font-size':'9px', 'shape':'diamond', 'width':'34px', 'height':'34px', 'border-width':1, 'border-color':'#94a3b8' } },
     { selector: ':parent', style: { 'background-opacity':0.15 } },
     { selector: 'edge', style: { 'line-color':'data(color)', 'target-arrow-color':'data(color)', 'target-arrow-shape':'triangle', 'arrow-scale':1.2, 'line-style':'data(style)', 'label':'data(label)', 'font-size':'9px', 'color':'#333', 'text-background-color':'#fff', 'text-background-opacity':0.9, 'text-background-padding':'2px', 'text-rotation':'autorotate', 'curve-style':'bezier', 'control-point-step-size':60, 'width':2, 'z-index':1 } },
-    { selector: 'edge[layer = "arch"]', style: { 'line-color':'#455a64', 'target-arrow-color':'#455a64', 'source-arrow-color':'#455a64', 'target-arrow-shape':'triangle', 'source-arrow-shape':'none', 'width':1.5, 'opacity':0.55 } },
+    { selector: 'edge[layer = "arch"]', style: { 'line-color':'#94a3b8', 'target-arrow-color':'#94a3b8', 'source-arrow-color':'#94a3b8', 'target-arrow-shape':'triangle', 'source-arrow-shape':'none', 'width':1.5, 'line-opacity':0.55, 'color':'#475569', 'text-opacity':1 } },
     { selector: 'edge[layer = "arch"][dir = "inout"]', style: { 'source-arrow-shape':'triangle' } },
     { selector: '.highlighted', style: { 'border-color':'#f9a825', 'border-width':3, 'opacity':1 } },
     { selector: '.faded', style: { 'opacity':0.15 } }

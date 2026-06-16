@@ -60,14 +60,18 @@ public final class GraphBuilder {
             if (compNodeId == null || connNodeId == null) continue;
 
             String dir = link.direction().token(); // in | out | inout
+            // Label the arch edge with the port it attaches through (the part after the dot)
+            String port = link.portRef().contains(".")
+                ? link.portRef().substring(link.portRef().indexOf('.') + 1)
+                : link.portRef();
             // Draw IN edges connector->component so the single arrow points at the component;
             // OUT and INOUT are drawn component->connector. The "dir" field drives arrowheads.
             String source = dir.equals("in") ? connNodeId : compNodeId;
             String target = dir.equals("in") ? compNodeId : connNodeId;
             edges.add(String.format(
                 "{ \"data\": { \"id\":\"arch%d\", \"source\":\"%s\", \"target\":\"%s\", " +
-                "\"label\":\"\", \"color\":\"#455a64\", \"style\":\"solid\", \"layer\":\"arch\", \"dir\":\"%s\" } }",
-                archSeq++, source, target, dir
+                "\"label\":\"%s\", \"color\":\"#455a64\", \"style\":\"solid\", \"layer\":\"arch\", \"dir\":\"%s\" } }",
+                archSeq++, source, target, escape(port), dir
             ));
         }
 
