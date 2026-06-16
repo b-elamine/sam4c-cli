@@ -39,6 +39,10 @@ public class ConformanceChecker {
             if (blank(c.name()))
                 errors.add("Connector: name is required (M2: Connector.name [1..1])");
             else connectorNames.add(c.name());
+            if (c.protocol() != null
+                    && !java.util.Set.of("tcp", "udp", "http", "grpc").contains(c.protocol().toLowerCase()))
+                errors.add("Connector '" + c.name() + "': protocol '" + c.protocol()
+                        + "' invalid (M2: Connector.protocol ∈ tcp|udp|http|grpc)");
         }
 
         // Referential integrity: collect every component name and its ports so we
@@ -72,6 +76,13 @@ public class ConformanceChecker {
                         + "' is not a declared connector");
         }
 
+        // Workload.deployedOn must reference an existing Host-typed component
+        java.util.Map<String, String> componentTypes = new java.util.HashMap<>();
+        collectTypes(arch.components(), componentTypes);
+        java.util.Set<String> hostNames = new java.util.HashSet<>();
+        componentTypes.forEach((n, t) -> { if (metamodel.isA(t, "Host")) hostNames.add(n); });
+        checkDeployedOn(arch.components(), hostNames, errors);
+
         return errors;
     }
 
@@ -83,6 +94,26 @@ public class ConformanceChecker {
             for (Port p : c.ports()) ports.add(p.name());
             out.put(c.name(), ports);
             if (!c.children().isEmpty()) collectPorts(c.children(), out);
+        }
+    }
+
+    /** Recursively collect each component's name -> type. */
+    private void collectTypes(List<Component> components, java.util.Map<String, String> out) {
+        for (Component c : components) {
+            out.put(c.name(), c.type());
+            if (!c.children().isEmpty()) collectTypes(c.children(), out);
+        }
+    }
+
+    /** Recursively verify `deployedOn` (in the properties map) points at a Host. */
+    private void checkDeployedOn(List<Component> components,
+                                 java.util.Set<String> hostNames, List<String> errors) {
+        for (Component c : components) {
+            Object target = c.properties().get("deployedOn");
+            if (target != null && !hostNames.contains(target.toString()))
+                errors.add("Component(" + c.name() + "): deployedOn '" + target
+                        + "' is not a Host (M2: Workload.deployedOn -> Host)");
+            if (!c.children().isEmpty()) checkDeployedOn(c.children(), hostNames, errors);
         }
     }
 
@@ -126,18 +157,77 @@ public class ConformanceChecker {
         if (blank(c.type()))
             errors.add(ctx + ": type is required (M2: Component.type [1..1])");
 
-        // M2: Component -> ports [0..*] -- each port needs a name
+        // M2: Component -> ports [0..*] -- each port needs a name; protocol from allowed set
         for (Port p : c.ports()) {
             if (blank(p.name()))
                 errors.add(ctx + ": Port.name is required (M2: Port.name [1..1])");
+            if (p.protocol() != null
+                    && !java.util.Set.of("tcp", "udp", "http", "grpc").contains(p.protocol().toLowerCase()))
+                errors.add(ctx + ": Port '" + p.name() + "' protocol '" + p.protocol()
+                        + "' invalid (M2: Port.protocol ∈ tcp|udp|http|grpc)");
+            if (p.number() != null && (p.number() < 1 || p.number() > 65535))
+                errors.add(ctx + ": Port '" + p.name() + "' number " + p.number()
+                        + " out of range (1..65535)");
+        }
+
+        // M2: Workload features (carried in the properties map) -- value sets
+        Object runtime = c.properties().get("runtime");
+        if (runtime != null
+                && !java.util.Set.of("container", "process", "function").contains(runtime.toString().toLowerCase()))
+            errors.add(ctx + ": runtime '" + runtime + "' invalid (M2: Workload.runtime ∈ container|process|function)");
+        Object exposure = c.properties().get("exposure");
+        if (exposure != null
+                && !java.util.Set.of("none", "internal", "external").contains(exposure.toString().toLowerCase()))
+            errors.add(ctx + ": exposure '" + exposure + "' invalid (M2: Workload.exposure ∈ none|internal|external)");
+        Object lifecycle = c.properties().get("lifecycle");
+        if (lifecycle != null
+                && !java.util.Set.of("continuous", "batch", "scheduled").contains(lifecycle.toString().toLowerCase()))
+            errors.add(ctx + ": lifecycle '" + lifecycle + "' invalid (M2: Workload.lifecycle ∈ continuous|batch|scheduled)");
+        Object trigger = c.properties().get("trigger");
+        if (trigger instanceof java.util.Map<?, ?> tm && tm.get("kind") != null
+                && !java.util.Set.of("http", "event", "schedule").contains(tm.get("kind").toString().toLowerCase()))
+            errors.add(ctx + ": trigger.kind '" + tm.get("kind") + "' invalid (∈ http|event|schedule)");
+
+        // Well-formedness invariants (C4)
+        // (6) an exposed workload must have at least one port
+        if (exposure != null && !exposure.toString().equalsIgnoreCase("none") && c.ports().isEmpty())
+            errors.add(ctx + ": exposure '" + exposure + "' but the workload has no ports");
+        // (7) a persistent Data workload must declare storage
+        if (Boolean.TRUE.equals(c.properties().get("persistent")) && !(c.properties().get("storage") instanceof java.util.Map))
+            errors.add(ctx + ": persistent=true but no storage declared");
+        // (8) scale: min <= replicas <= max
+        if (c.properties().get("scale") instanceof java.util.Map<?, ?> sc) {
+            Integer min = asInt(sc.get("min")), rep = asInt(sc.get("replicas")), max = asInt(sc.get("max"));
+            if (min != null && max != null && min > max)
+                errors.add(ctx + ": scale.min (" + min + ") > scale.max (" + max + ")");
+            if (rep != null && min != null && rep < min)
+                errors.add(ctx + ": scale.replicas (" + rep + ") < scale.min (" + min + ")");
+            if (rep != null && max != null && rep > max)
+                errors.add(ctx + ": scale.replicas (" + rep + ") > scale.max (" + max + ")");
         }
 
         // M2: verify type is a known concrete subclass of Component
-        boolean knownType = metamodel.isA(c.type(), "Component")
-                || c.type().equals("VM") || c.type().equals("App") || c.type().equals("Data");
+        boolean knownType = metamodel.isA(c.type(), "Component");
         if (!knownType)
             errors.add(ctx + ": unknown type '" + c.type()
                     + "'. Must conform to M2 Component hierarchy.");
+
+        // Well-formedness: Group containment rules
+        for (Component child : c.children()) {
+            if (c.type().equals("CoLocationGroup") && !metamodel.isA(child.type(), "Workload"))
+                errors.add(ctx + ": CoLocationGroup may contain only Workloads, not '"
+                        + child.name() + "' (" + child.type() + ")");
+            // (9) the deployable unit is the group: a member must not carry its own scale
+            if (c.type().equals("CoLocationGroup") && child.properties().get("scale") != null)
+                errors.add(ctx + ": member '" + child.name() + "' has its own scale; "
+                        + "scale belongs to the CoLocationGroup");
+            if (c.type().equals("HostPool") && !metamodel.isA(child.type(), "Host"))
+                errors.add(ctx + ": HostPool may contain only Hosts, not '"
+                        + child.name() + "' (" + child.type() + ")");
+            if (c.type().equals("Zone") && metamodel.isA(child.type(), "Host"))
+                errors.add(ctx + ": Zone may not directly contain a Host ('"
+                        + child.name() + "')");
+        }
 
         // M2: Component -> children [0..*] containment -- recurse
         for (Component child : c.children())
@@ -233,5 +323,11 @@ public class ConformanceChecker {
 
     private static boolean blank(String s) {
         return s == null || s.isBlank();
+    }
+
+    private static Integer asInt(Object o) {
+        if (o instanceof Number n) return n.intValue();
+        try { return o == null ? null : Integer.valueOf(o.toString()); }
+        catch (NumberFormatException e) { return null; }
     }
 }

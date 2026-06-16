@@ -193,10 +193,58 @@ Each component has the following fields:
 |---|---|---|
 | `name` | Yes | Unique name for this component |
 | `type` | Yes | Component type: `VM`, `App`, or `Data` (or any custom type you register) |
-| `ports` | No | List of port names on this component |
+| `ports` | No | Port names, or rich port objects (see below) |
 | `children` | No | Nested components (only meaningful for `VM`) |
 | `external` | No | Boolean. Marks a component as hosted outside your infrastructure (default: false) |
 | `attributes` | No | Key-value map used by the merger to evaluate security context predicates. A component with `Domain: frontend` will be matched by any context that contains `(Domain=frontend)` |
+| `runtime` | No | How a workload is packaged: `container` \| `process` \| `function` |
+| `exposure` | No | Reachability: `none` \| `internal` \| `external` |
+| `deployedOn` | No | Name of a Host (VM/PhysicalMachine/ManagedNode) this workload runs on (placement) |
+| `image` | No | Artifact/image the component runs, e.g. `registry/api:1.4.2` (deployment property) |
+| `scale` | No | Replication/autoscaling: `{ replicas, min, max, metric }` |
+| `resources` | No | Resource requests: `{ cpu, memory }` |
+| `lifecycle` | No | `continuous` \| `batch` \| `scheduled` (with `schedule` for scheduled) |
+| `persistent` / `storage` | No | (Data) `persistent: true` + `storage: { size, class }` |
+| `config` / `secrets` | No | `config: { KEY: value }` map; `secrets: [NAME]` references (never values) |
+| `health` | No | Probe: `{ path, port }` |
+| `trigger` | No | Invocation source: `{ kind: http\|event\|schedule, source }` |
+| `placement` | No | `{ zone, affinity, scope }` |
+
+**Component roles (M2).** Types fall into three roles:
+- **Workloads** — `App` (stateless), `Data` (stateful). They run; carry `runtime`/`exposure`/`scale`/`image`/`deployedOn`.
+- **Hosts** — `VM`, `PhysicalMachine`, `ManagedNode`. Workloads run on them (`deployedOn`).
+- **Groups** — `Zone` (boundary), `CoLocationGroup` (co-located, `shareNetwork`/`shareStorage`), `HostPool` (pool of hosts). They **contain** child components (via `children`).
+
+`runtime`/`exposure` values and `deployedOn` (must name a real Host) are validated. Group
+containment is validated too: a `CoLocationGroup` may hold only Workloads, a `HostPool` only
+Hosts, a `Zone` not a Host directly. Placement (`deployedOn`, a reference) is kept separate from
+grouping (`children`). Example of co-location:
+
+```yaml
+- name: api-pod
+  type: CoLocationGroup
+  shareNetwork: true
+  children:
+    - name: api
+      type: App
+      attributes: { Domain: backend }
+      runtime: container
+    - name: log-sidecar
+      type: App
+      attributes: { Domain: backend }
+```
+
+`image`, `scale`, and `resources` are **deployment properties** a generator consumes (replicas, image, sizing). They are carried in the component's `properties` map — optional, and not yet metamodel-validated (the "fast path"). The graph shows a replica badge (e.g. `Api x3`) for components with `scale.replicas`. Example:
+
+```yaml
+- name: api
+  type: App
+  attributes: { Domain: backend }
+  image: registry/api:1.4.2
+  scale: { replicas: 3, min: 2, max: 10, metric: cpu }
+  resources: { cpu: "500m", memory: "512Mi" }
+  ports: [ { name: api_in, number: 8080, protocol: http } ]
+```
 
 #### Type: VM
 
@@ -225,6 +273,27 @@ A running application, service, or microservice. Has ports.
     Domain: frontend
   ports: [http_in, api_out]
 ```
+
+#### Port forms
+
+Ports accept two forms. The **simple** form is just names:
+
+```yaml
+ports: [http_in, api_out]
+```
+
+The **rich** form adds a port number and protocol (needed for generation — emitting a
+Service, firewall rule, or security-group entry):
+
+```yaml
+ports:
+  - { name: http_in, number: 80,   protocol: http }
+  - { name: api_out, number: 8080, protocol: http }
+```
+
+`number` (1–65535) and `protocol` (`tcp` | `udp` | `http` | `grpc`) are optional; invalid
+values are conformance errors. The two forms can be mixed across components. The port `name`
+is what a `Link`'s `port: Component.name` reference points at.
 
 #### Type: Data
 
@@ -279,6 +348,18 @@ connectors:
 |---|---|---|
 | `name` | Yes | Unique name for the connector |
 | `external` | No | Boolean. Marks this connector as originating from outside the system (default: false) |
+| `protocol` | No | Channel protocol: `tcp` \| `udp` \| `http` \| `grpc` |
+
+`protocol` is a **structural** fact about the channel. Security requirements on a channel
+(e.g. "must be encrypted") are **not** declared here — they come from the security model: a
+`Confidentiality` rule resolves to the connector it crosses (via path resolution), so the
+encryption requirement is *derived at merge*, not duplicated on the connector. Example:
+
+```yaml
+connectors:
+  - name: BE_to_DB
+    protocol: tcp
+```
 
 ---
 

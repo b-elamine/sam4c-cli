@@ -131,10 +131,13 @@ public final class GraphBuilder {
             String attrsStr = escape(c.attributes().toString());
             String portsStr = escape(c.ports().stream().map(Port::name).collect(Collectors.joining(", ")));
 
+            // Show a replica badge (e.g. "Api  x3") when the component declares scale.replicas
+            String label = c.name() + replicaBadge(c);
+
             nodes.add(String.format(
                 "{ \"data\": { \"id\":\"%s\", \"label\":\"%s\", \"type\":\"%s\", " +
                 "\"attrs\":\"%s\", \"ports\":\"%s\", \"bg\":\"%s\", \"shape\":\"%s\"%s } }",
-                id, escape(c.name()), escape(c.type()),
+                id, escape(label), escape(c.type()),
                 attrsStr, portsStr, nodeColor(c.type()), nodeShape(c.type()), parent
             ));
 
@@ -143,13 +146,29 @@ public final class GraphBuilder {
         }
     }
 
+    /** "  x3" when the component declares scale.replicas (from the properties map), else "". */
+    private static String replicaBadge(Component c) {
+        Object scale = c.properties().get("scale");
+        if (scale instanceof java.util.Map<?, ?> m && m.get("replicas") != null)
+            return "  x" + m.get("replicas");
+        return "";
+    }
+
+    // Hosts and groups are containers (workloads/components are their children). Security
+    // edges connect leaf workloads, so containers are skipped as edge endpoints.
+    private static final java.util.Set<String> CONTAINER_TYPES = java.util.Set.of(
+        "VM", "PhysicalMachine", "ManagedNode", "Zone", "CoLocationGroup", "HostPool");
+
     private static boolean isContainer(Component c) {
-        return !c.children().isEmpty() || c.type().equals("VM");
+        return !c.children().isEmpty() || CONTAINER_TYPES.contains(c.type());
     }
 
     private static String nodeColor(String type) {
         return switch (type) {
-            case "VM"   -> "#e8eaf6";
+            case "VM", "PhysicalMachine", "ManagedNode" -> "#e8eaf6";  // hosts: lavender
+            case "Zone"           -> "#f1f5f9";                        // boundary: slate-50
+            case "CoLocationGroup" -> "#fef9c3";                       // co-location: amber-50
+            case "HostPool"       -> "#eef2ff";                        // host pool: indigo-50
             case "App"  -> "#1565c0";
             case "Data" -> "#e65100";
             default     -> "#37474f";
@@ -158,9 +177,11 @@ public final class GraphBuilder {
 
     private static String nodeShape(String type) {
         return switch (type) {
-            case "VM"   -> "roundrectangle";
             case "App"  -> "ellipse";
             case "Data" -> "barrel";
+            // hosts + groups are rounded rectangles (compound containers)
+            case "VM", "PhysicalMachine", "ManagedNode", "Zone", "CoLocationGroup", "HostPool"
+                        -> "roundrectangle";
             default     -> "diamond";
         };
     }

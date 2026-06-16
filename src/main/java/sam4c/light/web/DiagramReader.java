@@ -51,7 +51,8 @@ public final class DiagramReader {
         // Connectors
         List<Connector> connectors = new ArrayList<>();
         for (Map<String, Object> rc : (List<Map<String, Object>>) diagram.getOrDefault("connectors", List.of())) {
-            connectors.add(new Connector((String) rc.get("name"), bool(rc.get("external"))));
+            String protocol = rc.get("protocol") != null ? rc.get("protocol").toString() : null;
+            connectors.add(new Connector((String) rc.get("name"), bool(rc.get("external")), protocol));
         }
 
         // Links
@@ -78,15 +79,16 @@ public final class DiagramReader {
             if (rawAttrs instanceof Map<?, ?> m)
                 m.forEach((k, v) -> { if (v != null) attrs.put(k.toString(), v.toString()); });
 
-            List<Port> ports = new ArrayList<>();
-            Object rawPorts = rc.get("ports");
-            if (rawPorts instanceof List<?> l)
-                for (Object pn : l) ports.add(new Port(pn.toString()));
+            // reuse the loader so simple ("p") and rich ({name,number,protocol}) forms both work
+            List<Port> ports = sam4c.light.registry.ComponentRegistry.loadPorts(rc);
 
             List<Component> children = buildChildren(id, byParent);
 
+            // Deployment properties -- reuse the loader so the editor and CLI stay in sync
+            Map<String, Object> props = sam4c.light.registry.ComponentRegistry.loadProperties(rc);
+
             result.add(new Component(cname, type, ports, children,
-                    bool(rc.get("external")), attrs, Map.of()));
+                    bool(rc.get("external")), attrs, props));
         }
         return result;
     }

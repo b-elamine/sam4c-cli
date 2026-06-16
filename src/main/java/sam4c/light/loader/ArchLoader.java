@@ -58,7 +58,8 @@ public class ArchLoader {
                     Map<String, Object> m = (Map<String, Object>) yaml;
                     String cname = (String) m.get("name");
                     boolean external = ComponentRegistry.bool(m, "external");
-                    connectors.add(new Connector(cname, external));
+                    String protocol = m.get("protocol") != null ? m.get("protocol").toString() : null;
+                    connectors.add(new Connector(cname, external, protocol));
                 }
             }
         }

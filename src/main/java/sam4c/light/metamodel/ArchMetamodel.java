@@ -47,14 +47,45 @@ public final class ArchMetamodel {
                 .ref("children", "Component", true, 0, -1)
                 .build(),
 
-            MClass.builder("VM")  .superType("Component").build(),
-            MClass.builder("App") .superType("Component").build(),
-            MClass.builder("Data").superType("Component").build(),
+            // Workload (abstract): something that RUNS. Carries deployment semantics.
+            MClass.builder("Workload").abstractClass().superType("Component")
+                .attr("runtime",   STRING, 0, 1)   // container | process | function
+                .attr("exposure",  STRING, 0, 1)   // none | internal | external
+                .attr("lifecycle", STRING, 0, 1)   // continuous | batch | scheduled (platform-neutral)
+                .attr("schedule",  STRING, 0, 1)   // cron expression (when lifecycle=scheduled)
+                .ref("deployedOn", "Host", false, 0, 1)   // placement (reference, not containment)
+                .build(),
 
-            MClass.builder("Port").superType("ContextualElement").build(),
+            MClass.builder("App") .superType("Workload").build(),   // stateless
+            MClass.builder("Data").superType("Workload")            // stateful
+                .attr("persistent", BOOLEAN, 0, 1)
+                .build(),
+
+            // Host (abstract): something workloads RUN ON.
+            MClass.builder("Host").abstractClass().superType("Component").build(),
+            MClass.builder("VM")             .superType("Host").build(),
+            MClass.builder("PhysicalMachine").superType("Host").build(),
+            MClass.builder("ManagedNode")    .superType("Host").build(),
+
+            // Group (abstract): CONTAINS components (via the children tree -> single parent).
+            MClass.builder("Group").abstractClass().superType("Component").build(),
+            MClass.builder("Zone").superType("Group")
+                .attr("boundary", STRING, 0, 1)        // logical/isolation boundary -> namespace/VPC
+                .build(),
+            MClass.builder("CoLocationGroup").superType("Group")
+                .attr("shareNetwork", BOOLEAN, 0, 1)   // co-located, shared net/storage -> pod
+                .attr("shareStorage", BOOLEAN, 0, 1)
+                .build(),
+            MClass.builder("HostPool").superType("Group").build(),   // a pool of Hosts -> cluster
+
+            MClass.builder("Port").superType("ContextualElement")
+                .attr("number",   INT,    0, 1)
+                .attr("protocol", STRING, 0, 1)   // tcp | udp | http | grpc
+                .build(),
 
             MClass.builder("Connector").superType("ElementApp")
                 .attr("external", BOOLEAN, 0, 1)
+                .attr("protocol", STRING,  0, 1)   // tcp | udp | http | grpc (encryption is a security concern, not here)
                 .build(),
 
             MClass.builder("Link")

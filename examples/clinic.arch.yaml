@@ -10,18 +10,45 @@ components:
         type: App
         attributes:
           Domain: frontend
-        ports: [http_in, api_out]
+        runtime: container
+        exposure: external
+        ports:
+          - { name: http_in, number: 80, protocol: http }
+          - { name: api_out, number: 8080, protocol: http }
 
   - name: BackendVM
     type: VM
     attributes:
       Domain: backend
     children:
-      - name: SpringAPI
-        type: App
-        attributes:
-          Domain: backend
-        ports: [api_in, db_out, admin_in]
+      # SpringAPI + a logging sidecar are co-located (share the pod's network)
+      - name: api-pod
+        type: CoLocationGroup
+        shareNetwork: true
+        shareStorage: false
+        scale:                 # the pod scales as a unit (R-F5)
+          replicas: 3
+          min: 2
+          max: 10
+          metric: cpu
+        children:
+          - name: SpringAPI
+            type: App
+            attributes:
+              Domain: backend
+            runtime: container
+            exposure: internal
+            image: registry/clinic-api:1.4.2
+            resources:
+              cpu: "500m"
+              memory: "512Mi"
+            ports: [api_in, db_out, admin_in]
+          - name: LogSidecar
+            type: App
+            attributes:
+              Role: logging          # co-located in the pod, but NOT part of the backend trust zone
+            runtime: container
+            ports: [log_in]
 
   - name: DatabaseVM
     type: VM
@@ -33,6 +60,15 @@ components:
         attributes:
           Domain: database
           DataClass: clinical
+        runtime: container
+        image: postgres:16
+        persistent: true
+        storage:
+          size: 20Gi
+          class: ssd
+        config:
+          POSTGRES_DB: clinic
+        secrets: [DB_PASSWORD]
         ports: [db_in]
 
   - name: AdminVM
@@ -49,10 +85,14 @@ components:
 
 connectors:
   - name: FE_to_BE
+    protocol: http
   - name: BE_to_DB
+    protocol: tcp
   - name: Admin_to_BE
+    protocol: http
   - name: Internet
     external: true
+    protocol: http
 
 links:
   # Internet -> Nginx (Nginx receives inbound web traffic)

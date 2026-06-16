@@ -126,17 +126,18 @@ let currentView = 'both';
 const activeFilters = new Set(['Confidentiality','Integrity','Isolation','Authentication']);
 
 function coseLayout() {
-  return { name: 'cose', animate: true, animationDuration: 600, fit: true, padding: 40, nodeRepulsion: 9000, idealEdgeLength: 130 };
+  return { name: 'cose', animate: true, animationDuration: 600, fit: true, padding: 30, nodeRepulsion: 5000, idealEdgeLength: 90, nestingFactor: 0.6 };
 }
 function fitGraph() { if (cy) cy.fit(null, 40); }
 function relayout() { if (cy) cy.layout(coseLayout()).run(); }
 
 function cyStyle() {
   return [
-    { selector: 'node', style: { 'label':'data(label)', 'background-color':'data(bg)', 'shape':'data(shape)', 'color':'#ffffff', 'font-size':'10px', 'font-weight':500, 'text-valign':'center', 'text-halign':'center', 'text-wrap':'wrap', 'text-max-width':'90px', 'text-background-color':'#0f172a', 'text-background-opacity':0.6, 'text-background-padding':'3px', 'text-background-shape':'roundrectangle', 'border-width':1, 'border-color':'rgba(15,23,42,0.15)', 'padding':'10px', 'z-index':30 } },
-    { selector: 'node[type = "VM"]', style: { 'background-color':'#eef2ff', 'font-size':'11px', 'font-weight':600, 'text-valign':'top', 'text-halign':'center', 'text-margin-y':2, 'border-color':'#c7d2fe', 'border-width':1.5, 'padding':'20px' } },
+    { selector: 'node', style: { 'label':'data(label)', 'background-color':'data(bg)', 'shape':'data(shape)', 'color':'#ffffff', 'font-size':'10px', 'font-weight':500, 'text-valign':'center', 'text-halign':'center', 'text-wrap':'wrap', 'text-max-width':'90px', 'text-background-color':'#0f172a', 'text-background-opacity':0.6, 'text-background-padding':'3px', 'text-background-shape':'roundrectangle', 'border-width':1, 'border-color':'rgba(15,23,42,0.15)', 'padding':'6px', 'z-index':30 } },
     { selector: 'node[type = "Connector"]', style: { 'background-color':'data(bg)', 'font-size':'9px', 'shape':'diamond', 'width':'34px', 'height':'34px', 'border-width':1, 'border-color':'#94a3b8' } },
-    { selector: ':parent', style: { 'background-opacity':0.15 } },
+    // any container (VM, Host, Zone, CoLocationGroup, HostPool -- anything with children) gets
+    // compound styling: label at top, roomy padding, faded fill, dark text (it's a light box)
+    { selector: ':parent', style: { 'background-opacity':0.18, 'color':'#334155', 'font-size':'11px', 'font-weight':600, 'text-valign':'top', 'text-halign':'center', 'text-margin-y':1, 'text-background-opacity':0, 'border-color':'#cbd5e1', 'border-width':1, 'padding':'8px' } },
     { selector: 'edge', style: { 'line-color':'data(color)', 'target-arrow-color':'data(color)', 'target-arrow-shape':'triangle', 'arrow-scale':1.2, 'line-style':'data(style)', 'label':'data(label)', 'font-size':'9px', 'color':'#333', 'text-background-color':'#fff', 'text-background-opacity':0.9, 'text-background-padding':'2px', 'text-rotation':'autorotate', 'curve-style':'bezier', 'control-point-step-size':60, 'width':2, 'z-index':1 } },
     { selector: 'edge[layer = "arch"]', style: { 'line-color':'#94a3b8', 'target-arrow-color':'#94a3b8', 'source-arrow-color':'#94a3b8', 'target-arrow-shape':'triangle', 'source-arrow-shape':'none', 'width':1.5, 'line-opacity':0.55, 'color':'#475569', 'text-opacity':1 } },
     { selector: 'edge[layer = "arch"][dir = "inout"]', style: { 'source-arrow-shape':'triangle' } },

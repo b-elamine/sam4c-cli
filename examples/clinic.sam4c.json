@@ -10,16 +10,23 @@
         "name" : "Nginx",
         "type" : "App",
         "ports" : [ {
-          "name" : "http_in"
+          "name" : "http_in",
+          "number" : 80,
+          "protocol" : "http"
         }, {
-          "name" : "api_out"
+          "name" : "api_out",
+          "number" : 8080,
+          "protocol" : "http"
         } ],
         "children" : [ ],
         "external" : false,
         "attributes" : {
           "Domain" : "frontend"
         },
-        "properties" : { }
+        "properties" : {
+          "runtime" : "container",
+          "exposure" : "external"
+        }
       } ],
       "external" : false,
       "attributes" : {
@@ -31,21 +38,68 @@
       "type" : "VM",
       "ports" : [ ],
       "children" : [ {
-        "name" : "SpringAPI",
-        "type" : "App",
-        "ports" : [ {
-          "name" : "api_in"
+        "name" : "api-pod",
+        "type" : "CoLocationGroup",
+        "ports" : [ ],
+        "children" : [ {
+          "name" : "SpringAPI",
+          "type" : "App",
+          "ports" : [ {
+            "name" : "api_in",
+            "number" : null,
+            "protocol" : null
+          }, {
+            "name" : "db_out",
+            "number" : null,
+            "protocol" : null
+          }, {
+            "name" : "admin_in",
+            "number" : null,
+            "protocol" : null
+          } ],
+          "children" : [ ],
+          "external" : false,
+          "attributes" : {
+            "Domain" : "backend"
+          },
+          "properties" : {
+            "image" : "registry/clinic-api:1.4.2",
+            "runtime" : "container",
+            "exposure" : "internal",
+            "resources" : {
+              "cpu" : "500m",
+              "memory" : "512Mi"
+            }
+          }
         }, {
-          "name" : "db_out"
-        }, {
-          "name" : "admin_in"
+          "name" : "LogSidecar",
+          "type" : "App",
+          "ports" : [ {
+            "name" : "log_in",
+            "number" : null,
+            "protocol" : null
+          } ],
+          "children" : [ ],
+          "external" : false,
+          "attributes" : {
+            "Role" : "logging"
+          },
+          "properties" : {
+            "runtime" : "container"
+          }
         } ],
-        "children" : [ ],
         "external" : false,
-        "attributes" : {
-          "Domain" : "backend"
-        },
-        "properties" : { }
+        "attributes" : { },
+        "properties" : {
+          "scale" : {
+            "replicas" : 3,
+            "min" : 2,
+            "max" : 10,
+            "metric" : "cpu"
+          },
+          "shareNetwork" : true,
+          "shareStorage" : false
+        }
       } ],
       "external" : false,
       "attributes" : {
@@ -60,7 +114,9 @@
         "name" : "PatientDB",
         "type" : "Data",
         "ports" : [ {
-          "name" : "db_in"
+          "name" : "db_in",
+          "number" : null,
+          "protocol" : null
         } ],
         "children" : [ ],
         "external" : false,
@@ -68,7 +124,19 @@
           "Domain" : "database",
           "DataClass" : "clinical"
         },
-        "properties" : { }
+        "properties" : {
+          "image" : "postgres:16",
+          "runtime" : "container",
+          "persistent" : true,
+          "storage" : {
+            "size" : "20Gi",
+            "class" : "ssd"
+          },
+          "config" : {
+            "POSTGRES_DB" : "clinic"
+          },
+          "secrets" : [ "DB_PASSWORD" ]
+        }
       } ],
       "external" : false,
       "attributes" : {
@@ -83,7 +151,9 @@
         "name" : "AdminDashboard",
         "type" : "App",
         "ports" : [ {
-          "name" : "mgmt_out"
+          "name" : "mgmt_out",
+          "number" : null,
+          "protocol" : null
         } ],
         "children" : [ ],
         "external" : false,
@@ -101,16 +171,20 @@
     } ],
     "connectors" : [ {
       "name" : "FE_to_BE",
-      "external" : false
+      "external" : false,
+      "protocol" : "http"
     }, {
       "name" : "BE_to_DB",
-      "external" : false
+      "external" : false,
+      "protocol" : "tcp"
     }, {
       "name" : "Admin_to_BE",
-      "external" : false
+      "external" : false,
+      "protocol" : "http"
     }, {
       "name" : "Internet",
-      "external" : true
+      "external" : true,
+      "protocol" : "http"
     } ],
     "links" : [ {
       "portRef" : "Nginx.http_in",
@@ -279,7 +353,7 @@
       "attributes" : {
         "Domain" : "backend"
       },
-      "children" : [ "SpringAPI" ]
+      "children" : [ "api-pod" ]
     }, {
       "name" : "SpringAPI",
       "type" : "App",
@@ -364,7 +438,7 @@
       "attributes" : {
         "Domain" : "backend"
       },
-      "children" : [ "SpringAPI" ]
+      "children" : [ "api-pod" ]
     }, {
       "name" : "SpringAPI",
       "type" : "App",
@@ -392,7 +466,7 @@
       "attributes" : {
         "Domain" : "backend"
       },
-      "children" : [ "SpringAPI" ]
+      "children" : [ "api-pod" ]
     }, {
       "name" : "SpringAPI",
       "type" : "App",
@@ -445,7 +519,7 @@
       "attributes" : {
         "Domain" : "backend"
       },
-      "children" : [ "SpringAPI" ]
+      "children" : [ "api-pod" ]
     }, {
       "name" : "SpringAPI",
       "type" : "App",
@@ -564,7 +638,7 @@
       "attributes" : {
         "Domain" : "backend"
       },
-      "children" : [ "SpringAPI" ]
+      "children" : [ "api-pod" ]
     }, {
       "name" : "SpringAPI",
       "type" : "App",
@@ -593,7 +667,7 @@
       "attributes" : {
         "Domain" : "backend"
       },
-      "children" : [ "SpringAPI" ]
+      "children" : [ "api-pod" ]
     }, {
       "name" : "SpringAPI",
       "type" : "App",

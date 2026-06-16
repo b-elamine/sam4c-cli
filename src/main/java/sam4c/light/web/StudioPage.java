@@ -100,7 +100,7 @@ let linkSource = null;
 function editorStyle() {
   return [
     { selector: 'node', style: { 'label':'data(name)', 'background-color':'data(bg)', 'shape':'data(shape)', 'color':'#ffffff', 'font-size':'10px', 'font-weight':500, 'text-valign':'center', 'text-halign':'center', 'text-wrap':'wrap', 'text-max-width':'90px', 'text-background-color':'#0f172a', 'text-background-opacity':0.6, 'text-background-padding':'3px', 'text-background-shape':'roundrectangle', 'border-width':1, 'border-color':'rgba(15,23,42,0.15)', 'padding':'10px', 'z-index':30 } },
-    { selector: 'node[kind = "VM"]', style: { 'background-color':'#eef2ff', 'font-weight':600, 'text-valign':'top', 'text-margin-y':2, 'border-color':'#c7d2fe', 'border-width':1.5, 'padding':'20px' } },
+    { selector: ':parent', style: { 'background-opacity':0.18, 'color':'#334155', 'font-weight':600, 'text-valign':'top', 'text-margin-y':1, 'text-background-opacity':0, 'border-color':'#cbd5e1', 'border-width':1, 'padding':'8px' } },
     { selector: 'node[kind = "Connector"]', style: { 'shape':'diamond', 'background-color':'#64748b', 'width':'34px', 'height':'34px', 'font-size':'9px' } },
     { selector: ':parent', style: { 'background-opacity':0.15 } },
     { selector: 'edge', style: { 'line-color':'#455a64', 'target-arrow-color':'#455a64', 'source-arrow-color':'#455a64', 'target-arrow-shape':'triangle', 'curve-style':'bezier', 'width':2, 'label':'data(port)', 'font-size':'9px', 'color':'#333', 'text-background-color':'#fff', 'text-background-opacity':0.9, 'z-index':1 } },
@@ -112,8 +112,33 @@ function editorStyle() {
   ];
 }
 
-function colorFor(type) { return type==='VM'?'#e8eaf6':type==='App'?'#1565c0':type==='Data'?'#e65100':'#78909c'; }
-function shapeFor(type) { return type==='VM'?'roundrectangle':type==='App'?'ellipse':type==='Data'?'barrel':'diamond'; }
+function colorFor(type) {
+  const hosts = ['VM','PhysicalMachine','ManagedNode'];
+  if (hosts.includes(type)) return '#e8eaf6';
+  if (type==='Zone') return '#f1f5f9';
+  if (type==='CoLocationGroup') return '#fef9c3';
+  if (type==='HostPool') return '#eef2ff';
+  if (type==='App') return '#1565c0';
+  if (type==='Data') return '#e65100';
+  return '#78909c';
+}
+function shapeFor(type) { return (type==='App')?'ellipse':(type==='Data')?'barrel':(type==='Connector')?'diamond':'roundrectangle'; }
+
+// type classification (mirrors the metamodel roles)
+const HOST_TYPES = ['VM','PhysicalMachine','ManagedNode'];
+const GROUP_TYPES = ['Zone','CoLocationGroup','HostPool'];
+function isHostType(t){ return HOST_TYPES.includes(t); }
+function isGroupType(t){ return GROUP_TYPES.includes(t); }
+function isContainerType(t){ return isHostType(t) || isGroupType(t); }
+function isWorkloadType(t){ return t==='App' || t==='Data'; }
+function isConnectorType(t){ return t==='Connector'; }
+
+// build <option> list, marking `current` selected (includes a blank choice)
+function optionList(values, current){
+  return ['',...values].map(v => '<option value="'+v+'"'+(v===(current||'')?' selected':'')+'>'+(v||'(unset)')+'</option>').join('');
+}
+// set a node-data key if val is non-empty, else remove it (so unset fields don't serialize)
+function setOrDel(n, key, val){ if(val!==undefined && val!==null && val!=='') n.data(key, val); else n.removeData(key); }
 
 async function initEditor() {
   const res = await fetch('/api/palette');
@@ -188,35 +213,77 @@ function selectNode(id) {
 
 function renderProps() {
   const box = document.getElementById('props-body');
-  if (!selectedId) { box.innerHTML = '<p style="color:#6c7086;font-size:12px">Select a node, or add one from the palette.</p>'; return; }
+  if (!selectedId) { box.innerHTML = '<p style="color:var(--muted);font-size:12px">Select a node, or add one from the palette.</p>'; return; }
   const n = editorCy.getElementById(selectedId);
   const d = n.data();
+  const t = d.type;
+  const sc = d.scale || {};
   let html = '<label>Name</label><input id="p-name" value="' + (d.name||'') + '">';
 
-  if (d.kind === 'Connector') {
-    html += '<label>External</label><input id="p-ext" value="' + (d.external?'true':'false') + '">';
+  if (isConnectorType(t)) {
+    html += '<label>External</label> <input type="checkbox" id="p-ext"' + (d.external?' checked':'') + '>';
+    html += '<label>Protocol</label><select id="p-protocol">' + optionList(['tcp','udp','http','grpc'], d.protocol) + '</select>';
   } else {
-    // parent (nesting) -- choose a VM container
-    html += '<label>Inside (VM)</label><select id="p-parent" style="width:100%;background:#11111b;color:#cdd6f4;border:1px solid #313244;border-radius:4px;padding:6px"><option value="">(top level)</option>';
-    editorCy.nodes().forEach(o => { if (o.id() !== selectedId && o.data('kind') === 'VM') {
+    // parent (nesting) -- any container (host or group)
+    html += '<label>Inside (container)</label><select id="p-parent"><option value="">(top level)</option>';
+    editorCy.nodes().forEach(o => { if (o.id() !== selectedId && isContainerType(o.data('type'))) {
       const sel = (n.data('parent') === o.id()) ? ' selected' : '';
       html += '<option value="' + o.id() + '"' + sel + '>' + o.data('name') + '</option>';
     }});
     html += '</select>';
-    html += '<label>Ports (comma separated)</label><input id="p-ports" value="' + (d.ports||[]).join(', ') + '">';
+
+    if (isWorkloadType(t)) {
+      html += '<label>Runtime</label><select id="p-runtime">' + optionList(['container','process','function'], d.runtime) + '</select>';
+      html += '<label>Exposure</label><select id="p-exposure">' + optionList(['none','internal','external'], d.exposure) + '</select>';
+      html += '<label>Lifecycle</label><select id="p-lifecycle">' + optionList(['continuous','batch','scheduled'], d.lifecycle) + '</select>';
+      html += '<label>Image</label><input id="p-image" value="' + (d.image||'') + '">';
+      html += '<label>Deployed on (host)</label><select id="p-deployedOn"><option value="">(none)</option>';
+      editorCy.nodes().forEach(o => { if (isHostType(o.data('type'))) {
+        html += '<option' + (d.deployedOn===o.data('name')?' selected':'') + '>' + o.data('name') + '</option>'; }});
+      html += '</select>';
+      html += '<label>Scale (replicas / min / max)</label><div style="display:flex;gap:4px">'
+            + '<input id="p-replicas" placeholder="rep" value="'+(sc.replicas??'')+'">'
+            + '<input id="p-min" placeholder="min" value="'+(sc.min??'')+'">'
+            + '<input id="p-max" placeholder="max" value="'+(sc.max??'')+'"></div>';
+      if (t==='Data') {
+        const st = d.storage || {};
+        html += '<label>Persistent</label> <input type="checkbox" id="p-persistent"'+(d.persistent?' checked':'')+'>';
+        html += '<label>Storage (size / class)</label><div style="display:flex;gap:4px">'
+              + '<input id="p-stsize" placeholder="size" value="'+(st.size||'')+'">'
+              + '<input id="p-stclass" placeholder="class" value="'+(st['class']||'')+'"></div>';
+      }
+      html += '<h3 style="margin-top:14px">Ports</h3>';
+      (d.ports||[]).forEach((p,i) => {
+        html += '<div style="display:flex;gap:3px;margin:2px 0">'
+              + '<input data-pn="'+i+'" placeholder="name" value="'+(p.name||'')+'" style="flex:2">'
+              + '<input data-pnum="'+i+'" placeholder="port" value="'+(p.number??'')+'" style="flex:1">'
+              + '<select data-pp="'+i+'" style="flex:1">'+optionList(['tcp','udp','http','grpc'],p.protocol)+'</select>'
+              + '<span style="cursor:pointer;color:var(--danger);padding:4px" onclick="removePort('+i+')">&times;</span></div>';
+      });
+      html += '<button class="act-btn secondary" onclick="addPort()">+ port</button>';
+    }
+    if (t==='CoLocationGroup') {
+      html += '<label>Share network</label> <input type="checkbox" id="p-sharenet"'+(d.shareNetwork?' checked':'')+'>';
+      html += '<label>Share storage</label> <input type="checkbox" id="p-sharesto"'+(d.shareStorage?' checked':'')+'>';
+      html += '<label>Scale (replicas / min / max)</label><div style="display:flex;gap:4px">'
+            + '<input id="p-replicas" placeholder="rep" value="'+(sc.replicas??'')+'">'
+            + '<input id="p-min" placeholder="min" value="'+(sc.min??'')+'">'
+            + '<input id="p-max" placeholder="max" value="'+(sc.max??'')+'"></div>';
+    }
+    if (t==='Zone') html += '<label>Boundary</label><input id="p-boundary" value="'+(d.boundary||'')+'">';
+
     html += '<h3 style="margin-top:14px">Attributes</h3>';
-    const req = (palette.find(p => p.type === d.type) || {}).requiredAttrs || [];
+    const req = (palette.find(p => p.type === t) || {}).requiredAttrs || [];
     const keys = new Set([...req, ...Object.keys(d.attrs||{})]);
     keys.forEach(k => {
       const isReq = req.includes(k);
       html += '<label>' + k + (isReq ? ' <span class="req">*required</span>'
-              : ' <span style="color:#6c7086;cursor:pointer" onclick="removeAttr(\\'' + k + '\\')">[remove]</span>') + '</label>';
-      html += '<input data-attr="' + k + '" value="' + (d.attrs[k]||'') + '">';
+              : ' <span style="color:var(--muted);cursor:pointer" onclick="removeAttr(\\'' + k + '\\')">[remove]</span>') + '</label>';
+      html += '<input data-attr="' + k + '" value="' + ((d.attrs||{})[k]||'') + '">';
     });
-    // Free-form: add any attribute (Role, Tier, Env, ...) -- the model allows any key
-    html += '<div style="margin-top:10px;display:flex;gap:4px">';
-    html += '<input id="new-attr-key" placeholder="new attribute (e.g. Role)" style="flex:1">';
-    html += '<button class="act-btn secondary" onclick="addAttr()">+ Add</button></div>';
+    html += '<div style="margin-top:8px;display:flex;gap:4px">'
+          + '<input id="new-attr-key" placeholder="new attribute (e.g. Role)" style="flex:1">'
+          + '<button class="act-btn secondary" onclick="addAttr()">+ Add</button></div>';
   }
   html += '<div style="margin-top:14px"><button class="act-btn" onclick="applyProps()">Apply</button> <button class="act-btn secondary" onclick="deleteNode()">Delete</button></div>';
   box.innerHTML = html;
@@ -224,58 +291,110 @@ function renderProps() {
 
 // Capture whatever is currently typed in the properties form into the node's data,
 // so re-rendering (after add/remove attribute) never loses unsaved edits.
-function captureProps() {
+// Read everything currently in the form into the node's data (so re-rendering after
+// add/remove of an attribute or port never loses unsaved edits).
+function captureForm() {
   const n = editorCy.getElementById(selectedId);
   if (!n) return null;
-  const nameEl = document.getElementById('p-name');
-  if (nameEl) n.data('name', nameEl.value);
-  if (n.data('kind') !== 'Connector') {
-    const attrs = {};
-    document.querySelectorAll('#props-body input[data-attr]').forEach(inp => {
-      if (inp.value.trim()) attrs[inp.getAttribute('data-attr')] = inp.value.trim();
-    });
-    n.data('attrs', attrs);
+  const t = n.data('type');
+  const val = id => { const e = document.getElementById(id); return e ? e.value.trim() : undefined; };
+  const chk = id => { const e = document.getElementById(id); return e ? e.checked : undefined; };
+
+  const nm = val('p-name'); if (nm !== undefined) n.data('name', nm);
+
+  if (isConnectorType(t)) {
+    const ext = chk('p-ext'); if (ext !== undefined) n.data('external', ext);
+    setOrDel(n, 'protocol', val('p-protocol'));
+    return n;
   }
+
+  const attrs = {};
+  document.querySelectorAll('#props-body input[data-attr]').forEach(inp => {
+    if (inp.value.trim()) attrs[inp.getAttribute('data-attr')] = inp.value.trim();
+  });
+  n.data('attrs', attrs);
+
+  if (isWorkloadType(t)) {
+    setOrDel(n, 'runtime',   val('p-runtime'));
+    setOrDel(n, 'exposure',  val('p-exposure'));
+    setOrDel(n, 'lifecycle', val('p-lifecycle'));
+    setOrDel(n, 'image',     val('p-image'));
+    setOrDel(n, 'deployedOn', val('p-deployedOn'));
+    captureScale(n);
+    capturePorts(n);
+    if (t === 'Data') {
+      if (chk('p-persistent')) n.data('persistent', true); else n.removeData('persistent');
+      const size = val('p-stsize'), cls = val('p-stclass');
+      if (size || cls) { const st = {}; if (size) st.size = size; if (cls) st['class'] = cls; n.data('storage', st); }
+      else n.removeData('storage');
+    }
+  }
+  if (t === 'CoLocationGroup') {
+    if (chk('p-sharenet')) n.data('shareNetwork', true); else n.removeData('shareNetwork');
+    if (chk('p-sharesto')) n.data('shareStorage', true); else n.removeData('shareStorage');
+    captureScale(n);
+  }
+  if (t === 'Zone') setOrDel(n, 'boundary', val('p-boundary'));
   return n;
 }
 
+function captureScale(n) {
+  const num = id => { const e = document.getElementById(id); if (!e || !e.value.trim()) return undefined; const x = parseInt(e.value.trim()); return isNaN(x) ? undefined : x; };
+  const r = num('p-replicas'), mn = num('p-min'), mx = num('p-max');
+  if (r === undefined && mn === undefined && mx === undefined) { n.removeData('scale'); return; }
+  const sc = {}; if (r !== undefined) sc.replicas = r; if (mn !== undefined) sc.min = mn; if (mx !== undefined) sc.max = mx;
+  n.data('scale', sc);
+}
+
+function capturePorts(n) {
+  const rows = {};
+  document.querySelectorAll('#props-body input[data-pn]').forEach(i => { const k=i.getAttribute('data-pn'); (rows[k]=rows[k]||{}).name=i.value.trim(); });
+  document.querySelectorAll('#props-body input[data-pnum]').forEach(i => { const k=i.getAttribute('data-pnum'); const x=parseInt(i.value.trim()); if(!isNaN(x)) (rows[k]=rows[k]||{}).number=x; });
+  document.querySelectorAll('#props-body select[data-pp]').forEach(s => { const k=s.getAttribute('data-pp'); if(s.value) (rows[k]=rows[k]||{}).protocol=s.value; });
+  const ports = Object.keys(rows).sort((a,b)=>a-b).map(k=>rows[k]).filter(p=>p.name);
+  n.data('ports', ports);
+}
+
 function addAttr() {
-  const keyEl = document.getElementById('new-attr-key');
-  const key = keyEl.value.trim();
+  const key = (document.getElementById('new-attr-key').value || '').trim();
   if (!key) return;
-  const n = captureProps();
+  const n = captureForm();
   const attrs = Object.assign({}, n.data('attrs') || {});
   if (!(key in attrs)) attrs[key] = '';
   n.data('attrs', attrs);
   renderProps();
 }
-
 function removeAttr(key) {
-  const n = captureProps();
+  const n = captureForm();
   const attrs = Object.assign({}, n.data('attrs') || {});
   delete attrs[key];
   n.data('attrs', attrs);
   renderProps();
 }
+function addPort() {
+  const n = captureForm();
+  const ports = (n.data('ports') || []).slice();
+  ports.push({ name: 'p' + (ports.length + 1) });
+  n.data('ports', ports);
+  renderProps();
+}
+function removePort(i) {
+  const n = captureForm();
+  const ports = (n.data('ports') || []).slice();
+  ports.splice(i, 1);
+  n.data('ports', ports);
+  renderProps();
+}
 
 function applyProps() {
-  const n = editorCy.getElementById(selectedId);
-  n.data('name', document.getElementById('p-name').value);
-  if (n.data('kind') === 'Connector') {
-    n.data('external', document.getElementById('p-ext').value.trim() === 'true');
-  } else {
-    const parentSel = document.getElementById('p-parent').value;
-    n.move({ parent: parentSel || null });
-    const ports = document.getElementById('p-ports').value.split(',').map(s => s.trim()).filter(s => s);
-    n.data('ports', ports);
-    const attrs = {};
-    document.querySelectorAll('#props-body input[data-attr]').forEach(inp => {
-      if (inp.value.trim()) attrs[inp.getAttribute('data-attr')] = inp.value.trim();
-    });
-    n.data('attrs', attrs);
+  const n = captureForm();
+  if (!n) return;
+  if (!isConnectorType(n.data('type'))) {
+    const p = document.getElementById('p-parent');
+    if (p) n.move({ parent: p.value || null });
   }
   editorCy.nodes().removeClass('bad');
-  setMsg('', '');
+  setMsg('applied', 'ok');
 }
 
 function deleteNode() { if (selectedId) { editorCy.remove(editorCy.getElementById(selectedId)); selectedId = null; renderProps(); } }
@@ -291,11 +410,11 @@ function toggleLinkMode() {
 }
 
 function handleLinkClick(node) {
-  // First click: remember whatever was clicked (component OR connector).
+  // First click: remember whatever was clicked (workload OR connector).
   if (!linkSource) {
-    if (node.data('kind') === 'VM') { setMsg('Links attach to App/Data components or connectors, not VMs.', 'error'); return; }
+    if (isContainerType(node.data('type'))) { setMsg('Links attach to App/Data components or connectors, not containers.', 'error'); return; }
     linkSource = node; node.addClass('sel');
-    setMsg('now click the other end (the ' + (node.data('kind') === 'Connector' ? 'component' : 'connector') + ')', '');
+    setMsg('now click the other end (the ' + (isConnectorType(node.data('type')) ? 'component' : 'connector') + ')', '');
     return;
   }
   if (node.id() === linkSource.id()) return; // clicking the same node = no-op
@@ -303,24 +422,23 @@ function handleLinkClick(node) {
   // Second click: figure out which end is the component and which is the connector.
   const a = linkSource, b = node;
   let comp, conn;
-  if (a.data('kind') === 'Connector' && b.data('kind') !== 'Connector') { conn = a; comp = b; }
-  else if (b.data('kind') === 'Connector' && a.data('kind') !== 'Connector') { conn = b; comp = a; }
+  if (isConnectorType(a.data('type')) && !isConnectorType(b.data('type'))) { conn = a; comp = b; }
+  else if (isConnectorType(b.data('type')) && !isConnectorType(a.data('type'))) { conn = b; comp = a; }
   else { setMsg('A link must connect a component and a connector (one of each).', 'error'); return; }
-  if (comp.data('kind') === 'VM') { setMsg('Pick an App/Data component, not a VM.', 'error'); return; }
+  if (!isWorkloadType(comp.data('type'))) { setMsg('Pick an App/Data component.', 'error'); return; }
 
-  // A link must attach to a PORT of the component (portRef = "Component.port").
-  // If the component has no ports yet, create one here so the edge isn't labelled
-  // with just the component name; if it has several, ask which.
+  // A link attaches to a PORT (portRef = "Component.port"). Ports are objects {name,number,protocol}.
   let ports = comp.data('ports') || [];
   let port;
   if (ports.length === 0) {
     port = (prompt('Name a port on "' + comp.data('name') + '" for this link:', 'p1') || '').trim();
     if (!port) { setMsg('Link cancelled -- a port name is required.', 'error'); linkSource.removeClass('sel'); linkSource = null; return; }
-    comp.data('ports', ports.concat([port]));   // add the new port to the component
+    comp.data('ports', ports.concat([{ name: port }]));   // add the new port
   } else if (ports.length === 1) {
-    port = ports[0];
+    port = ports[0].name;
   } else {
-    port = (prompt('Which port of "' + comp.data('name') + '"? (' + ports.join(', ') + ')', ports[0]) || ports[0]).trim();
+    const names = ports.map(p => p.name);
+    port = (prompt('Which port of "' + comp.data('name') + '"? (' + names.join(', ') + ')', names[0]) || names[0]).trim();
   }
   const portRef = comp.data('name') + '.' + port;
 
@@ -340,12 +458,18 @@ function handleLinkClick(node) {
 // editorCy -> diagram domain structure
 function serializeDiagram() {
   const components = [], connectors = [], links = [];
+  const DEPLOY_KEYS = ['runtime','exposure','lifecycle','image','deployedOn','scale','persistent','storage','shareNetwork','shareStorage','boundary'];
   editorCy.nodes().forEach(n => {
     const d = n.data();
-    if (d.kind === 'Connector') {
-      connectors.push({ name: d.name, external: !!d.external });
+    if (isConnectorType(d.type)) {
+      const c = { name: d.name, external: !!d.external };
+      if (d.protocol) c.protocol = d.protocol;
+      connectors.push(c);
     } else {
-      components.push({ id: d.id, name: d.name, type: d.type, parent: n.data('parent') || null, attributes: d.attrs || {}, ports: d.ports || [] });
+      const comp = { id: d.id, name: d.name, type: d.type, parent: n.data('parent') || null,
+                     attributes: d.attrs || {}, ports: d.ports || [] };
+      DEPLOY_KEYS.forEach(k => { if (d[k] !== undefined) comp[k] = d[k]; });
+      components.push(comp);
     }
   });
   editorCy.edges().forEach(e => {

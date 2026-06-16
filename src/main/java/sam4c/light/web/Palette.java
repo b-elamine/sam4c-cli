@@ -28,7 +28,8 @@ public final class Palette {
             String type = cls.name();
 
             if (mm.isA(type, "Component")) {
-                boolean container = type.equals("VM"); // VM is the grouping type
+                // Hosts and Groups are containers (they hold child components)
+                boolean container = mm.isA(type, "Host") || mm.isA(type, "Group");
                 String req = AttributePolicy.requiredFor(type).stream()
                     .map(a -> "\"" + a + "\"").collect(Collectors.joining(", "));
                 items.add(String.format(
