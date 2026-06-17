@@ -157,7 +157,7 @@ public final class GraphBuilder {
     // Hosts and groups are containers (workloads/components are their children). Security
     // edges connect leaf workloads, so containers are skipped as edge endpoints.
     private static final java.util.Set<String> CONTAINER_TYPES = java.util.Set.of(
-        "VM", "PhysicalMachine", "ManagedNode", "Zone", "CoLocationGroup", "HostPool");
+        "VM", "PM", "Worker", "Zone", "Colocation", "HostPool");
 
     private static boolean isContainer(Component c) {
         return !c.children().isEmpty() || CONTAINER_TYPES.contains(c.type());
@@ -165,9 +165,9 @@ public final class GraphBuilder {
 
     private static String nodeColor(String type) {
         return switch (type) {
-            case "VM", "PhysicalMachine", "ManagedNode" -> "#e8eaf6";  // hosts: lavender
+            case "VM", "PM", "Worker" -> "#e8eaf6";  // hosts: lavender
             case "Zone"           -> "#f1f5f9";                        // boundary: slate-50
-            case "CoLocationGroup" -> "#fef9c3";                       // co-location: amber-50
+            case "Colocation" -> "#fef9c3";                       // co-location: amber-50
             case "HostPool"       -> "#eef2ff";                        // host pool: indigo-50
             case "App"  -> "#1565c0";
             case "Data" -> "#e65100";
@@ -180,7 +180,7 @@ public final class GraphBuilder {
             case "App"  -> "ellipse";
             case "Data" -> "barrel";
             // hosts + groups are rounded rectangles (compound containers)
-            case "VM", "PhysicalMachine", "ManagedNode", "Zone", "CoLocationGroup", "HostPool"
+            case "VM", "PM", "Worker", "Zone", "Colocation", "HostPool"
                         -> "roundrectangle";
             default     -> "diamond";
         };
@@ -192,6 +192,7 @@ public final class GraphBuilder {
             case Integrity       ignored -> "#2e7d32";
             case Isolation       ignored -> "#c62828";
             case Authentication  ignored -> "#6a1b9a";
+            case Authorization   ignored -> "#0891b2";
         };
     }
 

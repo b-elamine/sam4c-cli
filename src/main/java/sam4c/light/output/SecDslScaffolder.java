@@ -69,6 +69,7 @@ public class SecDslScaffolder {
         sb.append("// #property Integrity(sourceCtx, targetCtx);\n");
         sb.append("// #property Isolation(sourceCtx, targetCtx);\n");
         sb.append("// #property Authentication(whoCtx, mechanismCtx) -> targetCtx;\n");
+        sb.append("// #property Authorization(subjectCtx, resourceCtx, action [, action ...]);\n");
 
         return sb.toString();
     }

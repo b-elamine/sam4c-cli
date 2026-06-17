@@ -39,10 +39,7 @@ public class ConformanceChecker {
             if (blank(c.name()))
                 errors.add("Connector: name is required (M2: Connector.name [1..1])");
             else connectorNames.add(c.name());
-            if (c.protocol() != null
-                    && !java.util.Set.of("tcp", "udp", "http", "grpc").contains(c.protocol().toLowerCase()))
-                errors.add("Connector '" + c.name() + "': protocol '" + c.protocol()
-                        + "' invalid (M2: Connector.protocol ∈ tcp|udp|http|grpc)");
+            checkEnum(errors, "Connector '" + c.name() + "'", "Connector", "protocol", c.protocol());
         }
 
         // Referential integrity: collect every component name and its ports so we
@@ -161,28 +158,18 @@ public class ConformanceChecker {
         for (Port p : c.ports()) {
             if (blank(p.name()))
                 errors.add(ctx + ": Port.name is required (M2: Port.name [1..1])");
-            if (p.protocol() != null
-                    && !java.util.Set.of("tcp", "udp", "http", "grpc").contains(p.protocol().toLowerCase()))
-                errors.add(ctx + ": Port '" + p.name() + "' protocol '" + p.protocol()
-                        + "' invalid (M2: Port.protocol ∈ tcp|udp|http|grpc)");
+            checkEnum(errors, ctx + ": Port '" + p.name() + "'", "Port", "protocol", p.protocol());
             if (p.number() != null && (p.number() < 1 || p.number() > 65535))
                 errors.add(ctx + ": Port '" + p.name() + "' number " + p.number()
                         + " out of range (1..65535)");
         }
 
-        // M2: Workload features (carried in the properties map) -- value sets
-        Object runtime = c.properties().get("runtime");
-        if (runtime != null
-                && !java.util.Set.of("container", "process", "function").contains(runtime.toString().toLowerCase()))
-            errors.add(ctx + ": runtime '" + runtime + "' invalid (M2: Workload.runtime ∈ container|process|function)");
+        // M2: Workload features (carried in the properties map) -- enum value sets are
+        // read from the metamodel's `allowed` declarations (single source of truth).
         Object exposure = c.properties().get("exposure");
-        if (exposure != null
-                && !java.util.Set.of("none", "internal", "external").contains(exposure.toString().toLowerCase()))
-            errors.add(ctx + ": exposure '" + exposure + "' invalid (M2: Workload.exposure ∈ none|internal|external)");
-        Object lifecycle = c.properties().get("lifecycle");
-        if (lifecycle != null
-                && !java.util.Set.of("continuous", "batch", "scheduled").contains(lifecycle.toString().toLowerCase()))
-            errors.add(ctx + ": lifecycle '" + lifecycle + "' invalid (M2: Workload.lifecycle ∈ continuous|batch|scheduled)");
+        checkEnum(errors, ctx, c.type(), "runtime",   c.properties().get("runtime"));
+        checkEnum(errors, ctx, c.type(), "exposure",  exposure);
+        checkEnum(errors, ctx, c.type(), "lifecycle", c.properties().get("lifecycle"));
         Object trigger = c.properties().get("trigger");
         if (trigger instanceof java.util.Map<?, ?> tm && tm.get("kind") != null
                 && !java.util.Set.of("http", "event", "schedule").contains(tm.get("kind").toString().toLowerCase()))
@@ -214,13 +201,13 @@ public class ConformanceChecker {
 
         // Well-formedness: Group containment rules
         for (Component child : c.children()) {
-            if (c.type().equals("CoLocationGroup") && !metamodel.isA(child.type(), "Workload"))
-                errors.add(ctx + ": CoLocationGroup may contain only Workloads, not '"
+            if (c.type().equals("Colocation") && !metamodel.isA(child.type(), "Workload"))
+                errors.add(ctx + ": Colocation may contain only Workloads, not '"
                         + child.name() + "' (" + child.type() + ")");
             // (9) the deployable unit is the group: a member must not carry its own scale
-            if (c.type().equals("CoLocationGroup") && child.properties().get("scale") != null)
+            if (c.type().equals("Colocation") && child.properties().get("scale") != null)
                 errors.add(ctx + ": member '" + child.name() + "' has its own scale; "
-                        + "scale belongs to the CoLocationGroup");
+                        + "scale belongs to the Colocation");
             if (c.type().equals("HostPool") && !metamodel.isA(child.type(), "Host"))
                 errors.add(ctx + ": HostPool may contain only Hosts, not '"
                         + child.name() + "' (" + child.type() + ")");
@@ -283,6 +270,20 @@ public class ConformanceChecker {
                     errors.add("Authentication: tctx is required (M2: Authentication.tctx [1..1])");
                 else errors.addAll(checkRef(r.tctx(), "Authentication.tctx"));
             }
+
+            // M2: Authorization.subject [1..1], resource [1..1], action [1..1]
+            case Authorization r -> {
+                if (r.subject() == null)
+                    errors.add("Authorization: subject is required (M2: Authorization.subject [1..1])");
+                else errors.addAll(checkRef(r.subject(), "Authorization.subject"));
+                if (r.resource() == null)
+                    errors.add("Authorization: resource is required (M2: Authorization.resource [1..1])");
+                else errors.addAll(checkRef(r.resource(), "Authorization.resource"));
+                if (r.actions() == null || r.actions().isEmpty())
+                    errors.add("Authorization: at least one action is required (M2: Authorization.action [1..*])");
+                else if (r.actions().stream().anyMatch(ConformanceChecker::blank))
+                    errors.add("Authorization: action names must be non-blank");
+            }
         }
         return errors;
     }
@@ -323,6 +324,21 @@ public class ConformanceChecker {
 
     private static boolean blank(String s) {
         return s == null || s.isBlank();
+    }
+
+    /**
+     * Validate an enum-valued property against the metamodel's `allowed` set for that
+     * type+attribute. The allowed values live only in the M2 declaration, so the loader,
+     * Studio form, serializer and this check never drift.
+     */
+    private static void checkEnum(List<String> errors, String ctx, String type, String attr, Object value) {
+        if (value == null) return;
+        List<String> allowed = Sam4cMetamodel.INSTANCE.allAttributes(type).stream()
+                .filter(a -> a.name().equals(attr)).findFirst()
+                .map(MAttribute::allowed).orElse(List.of());
+        if (!allowed.isEmpty() && !allowed.contains(value.toString().toLowerCase()))
+            errors.add(ctx + ": " + attr + " '" + value + "' invalid (M2: " + type + "." + attr
+                    + " ∈ " + String.join("|", allowed) + ")");
     }
 
     private static Integer asInt(Object o) {

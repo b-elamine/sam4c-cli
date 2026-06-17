@@ -59,6 +59,7 @@ public class SemanticValidator {
             case Integrity r       -> r.tctx() != null;
             case Isolation r       -> r.tctx() != null;
             case Authentication r  -> r.tctx() != null;
+            case Authorization r   -> true;   // resource maps to tctx and is always required
         };
     }
 }

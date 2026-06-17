@@ -76,6 +76,13 @@ public class ModelInspector {
                 printSide("tctx (what)", rr.tctxComponents());
                 System.out.println("    Generator hint: put an auth gate on every tctx port that serves sctx traffic");
             }
+            case Authorization r -> {
+                String acts = String.join(", ", r.actions());
+                System.out.println("    Meaning: subject may perform [" + acts + "] on resource");
+                printSide("subject (who)",   rr.sctxComponents());
+                printSide("resource (what)", rr.tctxComponents());
+                System.out.println("    Generator hint: emit an RBAC/IAM policy allowing [" + acts + "] from subject to resource");
+            }
         }
         printPaths(rr);
     }

@@ -95,6 +95,7 @@ body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; b
     <button class="filter-btn" style="background:#2e7d32" data-rule="Integrity">Integrity</button>
     <button class="filter-btn" style="background:#c62828" data-rule="Isolation">Isolation</button>
     <button class="filter-btn" style="background:#6a1b9a" data-rule="Authentication">Authentication</button>
+    <button class="filter-btn" style="background:#0891b2" data-rule="Authorization">Authorization</button>
   </div>
 
   <h2>Warnings</h2>
@@ -108,6 +109,7 @@ body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; b
     <div class="legend-item"><div class="legend-line" style="background:#2e7d32"></div>Integrity</div>
     <div class="legend-item"><div class="legend-dash" style="border-color:#c62828"></div>Isolation</div>
     <div class="legend-item"><div class="legend-line" style="background:#6a1b9a"></div>Authentication</div>
+    <div class="legend-item"><div class="legend-line" style="background:#0891b2"></div>Authorization</div>
     <div class="legend-item"><div class="legend-line" style="background:#455a64"></div>Architecture link</div>
   </div>
 </div>
@@ -123,7 +125,7 @@ body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; b
         return """
 let cy = null;
 let currentView = 'both';
-const activeFilters = new Set(['Confidentiality','Integrity','Isolation','Authentication']);
+const activeFilters = new Set(['Confidentiality','Integrity','Isolation','Authentication','Authorization']);
 
 function coseLayout() {
   return { name: 'cose', animate: true, animationDuration: 600, fit: true, padding: 30, nodeRepulsion: 5000, idealEdgeLength: 90, nestingFactor: 0.6 };
@@ -135,7 +137,7 @@ function cyStyle() {
   return [
     { selector: 'node', style: { 'label':'data(label)', 'background-color':'data(bg)', 'shape':'data(shape)', 'color':'#ffffff', 'font-size':'10px', 'font-weight':500, 'text-valign':'center', 'text-halign':'center', 'text-wrap':'wrap', 'text-max-width':'90px', 'text-background-color':'#0f172a', 'text-background-opacity':0.6, 'text-background-padding':'3px', 'text-background-shape':'roundrectangle', 'border-width':1, 'border-color':'rgba(15,23,42,0.15)', 'padding':'6px', 'z-index':30 } },
     { selector: 'node[type = "Connector"]', style: { 'background-color':'data(bg)', 'font-size':'9px', 'shape':'diamond', 'width':'34px', 'height':'34px', 'border-width':1, 'border-color':'#94a3b8' } },
-    // any container (VM, Host, Zone, CoLocationGroup, HostPool -- anything with children) gets
+    // any container (VM, Host, Zone, Colocation, HostPool -- anything with children) gets
     // compound styling: label at top, roomy padding, faded fill, dark text (it's a light box)
     { selector: ':parent', style: { 'background-opacity':0.18, 'color':'#334155', 'font-size':'11px', 'font-weight':600, 'text-valign':'top', 'text-halign':'center', 'text-margin-y':1, 'text-background-opacity':0, 'border-color':'#cbd5e1', 'border-width':1, 'padding':'8px' } },
     { selector: 'edge', style: { 'line-color':'data(color)', 'target-arrow-color':'data(color)', 'target-arrow-shape':'triangle', 'arrow-scale':1.2, 'line-style':'data(style)', 'label':'data(label)', 'font-size':'9px', 'color':'#333', 'text-background-color':'#fff', 'text-background-opacity':0.9, 'text-background-padding':'2px', 'text-rotation':'autorotate', 'curve-style':'bezier', 'control-point-step-size':60, 'width':2, 'z-index':1 } },

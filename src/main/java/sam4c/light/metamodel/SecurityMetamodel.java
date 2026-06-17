@@ -84,6 +84,12 @@ public final class SecurityMetamodel {
                 .ref("tctx", "Ref", true, 1, 1)
                 .build(),
 
+            MClass.builder("Authorization").superType("SecurityRule")
+                .ref("subject",  "Ref", true, 1, 1)   // who
+                .ref("resource", "Ref", true, 1, 1)   // what
+                .attr("action",  STRING, 1, -1)       // one or more: read | write | admin | ...
+                .build(),
+
             MClass.builder("Ref").abstractClass().build(),
 
             MClass.builder("NamedRef").superType("Ref")

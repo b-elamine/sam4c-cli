@@ -23,3 +23,5 @@
 #property Confidentiality(clinicalDataCtx, backendCtx);
 
 #property Confidentiality(piiCtx, backendCtx);
+
+#property Authorization(adminRoleCtx, dbCtx, read, write);

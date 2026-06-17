@@ -218,6 +218,14 @@ public class ModelSerializer {
                     writeRef(g, p, "actx", r.actx());
                     writeRef(g, p, "tctx", r.tctx());
                 }
+                case Authorization r -> {
+                    writeRef(g, p, "subject", r.subject());
+                    writeRef(g, p, "resource", r.resource());
+                    g.writeFieldName("actions");
+                    g.writeStartArray();
+                    for (String a : r.actions()) g.writeString(a);
+                    g.writeEndArray();
+                }
             }
             g.writeEndObject();
         }

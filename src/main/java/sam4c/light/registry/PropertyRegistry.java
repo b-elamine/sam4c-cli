@@ -1,6 +1,7 @@
 package sam4c.light.registry;
 
 import sam4c.light.model.ref.Ref;
+import sam4c.light.model.ref.NamedRef;
 import sam4c.light.model.rule.*;
 
 import java.util.*;
@@ -36,6 +37,21 @@ public class PropertyRegistry {
                         require(args, 0, "Authentication"),
                         require(args, 1, "Authentication"),
                         Objects.requireNonNull(ret, "Authentication requires a -> target"));
+            }
+        });
+        r.register(new RuleFactory() {
+            public String keyword() { return "Authorization"; }
+            public SecurityRule create(List<Ref> args, Ref ret) {
+                // Authorization(subject, resource, action [, action ...]) -- arg0=subject,
+                // arg1=resource, the rest are action names (a role may grant several verbs).
+                require(args, 1, "Authorization");
+                require(args, 2, "Authorization");
+                List<String> actions = new ArrayList<>();
+                for (int i = 2; i < args.size(); i++) {
+                    Ref a = args.get(i);
+                    actions.add(a instanceof NamedRef nr ? nr.name() : a.toString());
+                }
+                return new Authorization(args.get(0), args.get(1), actions);
             }
         });
         return r;
