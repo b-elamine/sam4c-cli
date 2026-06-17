@@ -23,7 +23,7 @@ components:
     children:
       # SpringAPI + a logging sidecar are co-located (share the pod's network)
       - name: api-pod
-        type: CoLocationGroup
+        type: Colocation
         shareNetwork: true
         shareStorage: false
         scale:                 # the pod scales as a unit (R-F5)

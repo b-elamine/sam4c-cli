@@ -29,11 +29,11 @@ public class ComponentRegistry {
             }
         });
 
-        // Container types -- hosts (VM/PhysicalMachine/ManagedNode) and groups
-        // (Zone/CoLocationGroup/HostPool) all load the same way: they hold child components
+        // Container types -- hosts (VM/PM/Worker) and groups
+        // (Zone/Colocation/HostPool) all load the same way: they hold child components
         // via the children tree. Their distinguishing attrs ride in the properties map.
         for (String containerType : new String[]{
-                "VM", "PhysicalMachine", "ManagedNode", "Zone", "CoLocationGroup", "HostPool"}) {
+                "VM", "PM", "Worker", "Zone", "Colocation", "HostPool"}) {
             final String t = containerType;
             r.register(new ComponentTypeHandler() {
                 public String typeName() { return t; }
