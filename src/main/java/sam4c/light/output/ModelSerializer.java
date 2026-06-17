@@ -226,6 +226,10 @@ public class ModelSerializer {
                     for (String a : r.actions()) g.writeString(a);
                     g.writeEndArray();
                 }
+                case Availability r -> {
+                    writeRef(g, p, "target", r.target());
+                    g.writeStringField("level", r.level());
+                }
             }
             g.writeEndObject();
         }

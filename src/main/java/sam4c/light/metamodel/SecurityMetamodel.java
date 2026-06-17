@@ -16,7 +16,9 @@ import static sam4c.light.metamodel.MDataType.STRING;
  *           ├── Confidentiality(sctx, tctx?)
  *           ├── Integrity(sctx, tctx?)
  *           ├── Isolation(sctx, tctx?)
- *           └── Authentication(sctx, actx, tctx)
+ *           ├── Authentication(sctx, actx, tctx)
+ *           ├── Authorization(subject, resource, action+)
+ *           └── Availability(target, level)
  *
  *   Ref (abstract)                       -- reference inside a rule or context
  *     ├── NamedRef                       -- reference by name ("frontendCtx", "Nginx")
@@ -88,6 +90,11 @@ public final class SecurityMetamodel {
                 .ref("subject",  "Ref", true, 1, 1)   // who
                 .ref("resource", "Ref", true, 1, 1)   // what
                 .attr("action",  STRING, 1, -1)       // one or more: read | write | admin | ...
+                .build(),
+
+            MClass.builder("Availability").superType("SecurityRule")
+                .ref("target", "Ref", true, 1, 1)                    // the context being constrained
+                .attr("level", STRING, 1, 1, "high", "medium", "low")
                 .build(),
 
             MClass.builder("Ref").abstractClass().build(),

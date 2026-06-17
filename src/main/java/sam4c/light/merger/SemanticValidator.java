@@ -4,6 +4,7 @@ import sam4c.light.model.*;
 import sam4c.light.model.rule.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,7 +50,62 @@ public class SemanticValidator {
                         + "-- predicate satisfied by nothing in the architecture");
         }
 
+        // 3. Availability satisfiability (replica half): a medium/high requirement needs
+        // redundancy (>= 2 copies) on every workload it governs, or it is a single point
+        // of failure -- the architecture does not actually deliver the requested resilience.
+        // (The "spread across failure domains" half is not checked yet: placement is free-form.)
+        Map<String, Integer> replicas = effectiveReplicas(model.architecture());
+        for (ResolvedRule rr : model.resolvedRules()) {
+            if (!(rr.rule() instanceof Availability av)) continue;
+            String level = av.level() == null ? "" : av.level().toLowerCase();
+            if (level.equals("low")) continue;   // low = no availability requirement
+            for (Component c : rr.sctxComponents()) {
+                if (!isWorkload(c)) continue;     // only workloads run as replicated copies
+                Integer eff = replicas.get(c.name());
+                int n = (eff == null) ? 1 : eff;  // no scale declared anywhere = a single copy
+                if (n < 2)
+                    warnings.add("Availability=" + level + " but '" + c.name() + "' has "
+                            + n + " copy" + (n == 1 ? "" : "ies") + " (needs >= 2) "
+                            + "-- single point of failure, requirement not satisfied");
+            }
+        }
+
         return warnings;
+    }
+
+    private static boolean isWorkload(Component c) {
+        return c.type().equals("App") || c.type().equals("Data");
+    }
+
+    /**
+     * Effective replica count per component name: a workload's own scale.replicas, or the
+     * replicas of its enclosing Colocation (scale attaches to the deployable unit, R-F5).
+     * Null = no scale declared anywhere (treated as a single copy by the caller).
+     */
+    private static Map<String, Integer> effectiveReplicas(Architecture arch) {
+        Map<String, Integer> out = new HashMap<>();
+        walkReplicas(arch.components(), null, out);
+        return out;
+    }
+
+    private static void walkReplicas(List<Component> comps, Integer enclosingColo,
+                                     Map<String, Integer> out) {
+        for (Component c : comps) {
+            Integer own = replicasOf(c);
+            out.put(c.name(), own != null ? own : enclosingColo);
+            // a Colocation scales as one unit -> its members inherit its replica count
+            Integer childCtx = c.type().equals("Colocation") && own != null ? own : enclosingColo;
+            walkReplicas(c.children(), childCtx, out);
+        }
+    }
+
+    private static Integer replicasOf(Component c) {
+        if (c.properties().get("scale") instanceof Map<?, ?> sm) {
+            Object r = sm.get("replicas");
+            if (r instanceof Number n) return n.intValue();
+            if (r != null) try { return Integer.valueOf(r.toString()); } catch (NumberFormatException ignored) {}
+        }
+        return null;
     }
 
     /** True if the rule has a tctx argument that was actually given (not null). */
@@ -60,6 +116,7 @@ public class SemanticValidator {
             case Isolation r       -> r.tctx() != null;
             case Authentication r  -> r.tctx() != null;
             case Authorization r   -> true;   // resource maps to tctx and is always required
+            case Availability r    -> false;  // single context (target -> sctx); no tctx side
         };
     }
 }

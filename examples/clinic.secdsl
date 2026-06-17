@@ -25,3 +25,5 @@
 #property Confidentiality(piiCtx, backendCtx);
 
 #property Authorization(adminRoleCtx, dbCtx, read, write);
+
+#property Availability(backendCtx, high);

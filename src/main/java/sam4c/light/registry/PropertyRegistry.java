@@ -54,6 +54,17 @@ public class PropertyRegistry {
                 return new Authorization(args.get(0), args.get(1), actions);
             }
         });
+        r.register(new RuleFactory() {
+            public String keyword() { return "Availability"; }
+            public SecurityRule create(List<Ref> args, Ref ret) {
+                // Availability(target, level) -- arg0=target context, arg1=level token
+                // (high|medium|low), read as a name like Authorization's action tokens.
+                require(args, 0, "Availability");
+                Ref lvl = require(args, 1, "Availability");
+                String level = lvl instanceof NamedRef nr ? nr.name() : lvl.toString();
+                return new Availability(args.get(0), level);
+            }
+        });
         return r;
     }
 

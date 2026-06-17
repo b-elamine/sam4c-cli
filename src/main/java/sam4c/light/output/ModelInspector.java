@@ -83,6 +83,11 @@ public class ModelInspector {
                 printSide("resource (what)", rr.tctxComponents());
                 System.out.println("    Generator hint: emit an RBAC/IAM policy allowing [" + acts + "] from subject to resource");
             }
+            case Availability r -> {
+                System.out.println("    Meaning: target must stay available at level [" + r.level() + "]");
+                printSide("target", rr.sctxComponents());
+                System.out.println("    Generator hint: enforce min replicas / PodDisruptionBudget / multi-zone spread on target");
+            }
         }
         printPaths(rr);
     }

@@ -284,6 +284,18 @@ public class ConformanceChecker {
                 else if (r.actions().stream().anyMatch(ConformanceChecker::blank))
                     errors.add("Authorization: action names must be non-blank");
             }
+
+            // M2: Availability.target [1..1], level [1..1] in {high, medium, low}
+            case Availability r -> {
+                if (r.target() == null)
+                    errors.add("Availability: target is required (M2: Availability.target [1..1])");
+                else errors.addAll(checkRef(r.target(), "Availability.target"));
+                if (blank(r.level()))
+                    errors.add("Availability: level is required (M2: Availability.level [1..1])");
+                else if (!java.util.Set.of("high", "medium", "low").contains(r.level().toLowerCase()))
+                    errors.add("Availability: level '" + r.level()
+                            + "' invalid (M2: Availability.level in high|medium|low)");
+            }
         }
         return errors;
     }

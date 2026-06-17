@@ -193,6 +193,7 @@ public final class GraphBuilder {
             case Isolation       ignored -> "#c62828";
             case Authentication  ignored -> "#6a1b9a";
             case Authorization   ignored -> "#0891b2";
+            case Availability    ignored -> "#00897b";   // node-level: no edge drawn, kept for exhaustiveness
         };
     }
 

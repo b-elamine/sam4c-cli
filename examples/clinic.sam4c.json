@@ -338,6 +338,12 @@
         "name" : "dbCtx"
       },
       "actions" : [ "read", "write" ]
+    }, {
+      "type" : "Availability",
+      "target" : {
+        "name" : "backendCtx"
+      },
+      "level" : "high"
     } ]
   },
   "coverage" : {
@@ -711,6 +717,23 @@
         "DataClass" : "clinical"
       },
       "ports" : [ "db_in" ]
+    } ]
+  }, {
+    "type" : "Availability",
+    "sctx" : [ {
+      "name" : "BackendVM",
+      "type" : "VM",
+      "attributes" : {
+        "Domain" : "backend"
+      },
+      "children" : [ "api-pod" ]
+    }, {
+      "name" : "SpringAPI",
+      "type" : "App",
+      "attributes" : {
+        "Domain" : "backend"
+      },
+      "ports" : [ "api_in", "db_out", "admin_in" ]
     } ]
   } ]
 }

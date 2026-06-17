@@ -87,6 +87,7 @@ public class ModelMerger {
                                         actx = resolveRef(r.actx(), coverage, all, unresolved); }
             case Authorization r   -> { sctx = resolveRef(r.subject(), coverage, all, unresolved);   // who
                                         tctx = resolveRef(r.resource(), coverage, all, unresolved); } // what
+            case Availability r    -> { sctx = resolveRef(r.target(), coverage, all, unresolved); }   // single context, no path
         }
         // Resolve the concrete connector paths between the source and target sides
         List<ResolvedPath> paths = resolvePaths(sctx, tctx, arch);
