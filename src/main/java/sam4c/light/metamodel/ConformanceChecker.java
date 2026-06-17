@@ -170,6 +170,7 @@ public class ConformanceChecker {
         checkEnum(errors, ctx, c.type(), "runtime",   c.properties().get("runtime"));
         checkEnum(errors, ctx, c.type(), "exposure",  exposure);
         checkEnum(errors, ctx, c.type(), "lifecycle", c.properties().get("lifecycle"));
+        checkEnum(errors, ctx, c.type(), "spread",    c.properties().get("spread"));
         Object trigger = c.properties().get("trigger");
         if (trigger instanceof java.util.Map<?, ?> tm && tm.get("kind") != null
                 && !java.util.Set.of("http", "event", "schedule").contains(tm.get("kind").toString().toLowerCase()))

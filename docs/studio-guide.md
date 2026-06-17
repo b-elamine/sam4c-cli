@@ -117,6 +117,7 @@ For a workload (App or Data):
 | Health | A map describing the health check, for example `path`, `port`. |
 | Trigger | A map describing what invokes the workload, for example `kind`, `source`. |
 | Placement | A map of placement hints, for example `zone`, `affinity`, `scope`. |
+| Spread | none, host, or zone. How the copies fan out: none (no constraint), host (different machines), zone (different data centers). Used by the Availability check. |
 | Deployed on (host) | A dropdown to place this workload on a specific host. |
 | Ports | One row per port, each with a name, a port number, and a protocol. Use "+ port" to add a row and the "x" to remove one. |
 
@@ -134,6 +135,7 @@ For a Colocation:
 | Share network | Tick if the members share one network. |
 | Share storage | Tick if the members share storage. |
 | Scale | A map. The group scales as one unit. |
+| Spread | none, host, or zone. How the unit's copies fan out across failure domains. |
 
 For a Zone: a Boundary field (the boundary name or level).
 

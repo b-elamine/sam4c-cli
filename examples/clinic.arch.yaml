@@ -31,6 +31,7 @@ components:
           min: 2
           max: 10
           metric: cpu
+        spread: zone           # the 3 copies fan out across zones (satisfies Availability=high)
         children:
           - name: SpringAPI
             type: App

@@ -50,11 +50,12 @@ public class SemanticValidator {
                         + "-- predicate satisfied by nothing in the architecture");
         }
 
-        // 3. Availability satisfiability (replica half): a medium/high requirement needs
-        // redundancy (>= 2 copies) on every workload it governs, or it is a single point
-        // of failure -- the architecture does not actually deliver the requested resilience.
-        // (The "spread across failure domains" half is not checked yet: placement is free-form.)
+        // 3. Availability satisfiability: a medium/high requirement must be backed by the
+        // architecture, or it is not actually delivered.
+        //   medium -> redundancy: >= 2 effective copies
+        //   high   -> redundancy AND spread across zones (survives a whole-zone outage)
         Map<String, Integer> replicas = effectiveReplicas(model.architecture());
+        Map<String, String>  spread   = effectiveSpread(model.architecture());
         for (ResolvedRule rr : model.resolvedRules()) {
             if (!(rr.rule() instanceof Availability av)) continue;
             String level = av.level() == null ? "" : av.level().toLowerCase();
@@ -67,6 +68,10 @@ public class SemanticValidator {
                     warnings.add("Availability=" + level + " but '" + c.name() + "' has "
                             + n + " copy" + (n == 1 ? "" : "ies") + " (needs >= 2) "
                             + "-- single point of failure, requirement not satisfied");
+                if (level.equals("high") && !"zone".equalsIgnoreCase(spread.get(c.name())))
+                    warnings.add("Availability=high but '" + c.name() + "' is not spread across zones "
+                            + "(set spread: zone on the workload or its Colocation) "
+                            + "-- a whole-zone outage would take it down");
             }
         }
 
@@ -106,6 +111,32 @@ public class SemanticValidator {
             if (r != null) try { return Integer.valueOf(r.toString()); } catch (NumberFormatException ignored) {}
         }
         return null;
+    }
+
+    /**
+     * Effective spread per component name: a workload's own `spread`, or that of its
+     * enclosing Colocation (the spread, like scale, attaches to the deployable unit).
+     * Null = none declared.
+     */
+    private static Map<String, String> effectiveSpread(Architecture arch) {
+        Map<String, String> out = new HashMap<>();
+        walkSpread(arch.components(), null, out);
+        return out;
+    }
+
+    private static void walkSpread(List<Component> comps, String enclosingColo,
+                                   Map<String, String> out) {
+        for (Component c : comps) {
+            String own = spreadOf(c);
+            out.put(c.name(), own != null ? own : enclosingColo);
+            String childCtx = c.type().equals("Colocation") && own != null ? own : enclosingColo;
+            walkSpread(c.children(), childCtx, out);
+        }
+    }
+
+    private static String spreadOf(Component c) {
+        Object s = c.properties().get("spread");
+        return s == null ? null : s.toString();
     }
 
     /** True if the rule has a tctx argument that was actually given (not null). */

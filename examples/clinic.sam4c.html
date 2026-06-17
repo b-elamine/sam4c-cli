@@ -232,7 +232,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('cl
 initGraph({ nodes: [{ "data": { "id":"n0", "label":"FrontendVM", "type":"VM", "attrs":"{Domain=frontend}", "ports":"", "bg":"#e8eaf6", "shape":"roundrectangle" } },
 { "data": { "id":"n1", "label":"Nginx", "type":"App", "attrs":"{Domain=frontend}", "ports":"http_in, api_out", "bg":"#1565c0", "shape":"ellipse", "parent":"n0" } },
 { "data": { "id":"n2", "label":"BackendVM", "type":"VM", "attrs":"{Domain=backend}", "ports":"", "bg":"#e8eaf6", "shape":"roundrectangle" } },
-{ "data": { "id":"n3", "label":"api-pod  x3", "type":"Colocation", "attrs":"{}", "ports":"", "bg":"#fef9c3", "shape":"roundrectangle", "parent":"n2" } },
+{ "data": { "id":"n3", "label":"api-pod  x3 - zone", "type":"Colocation", "attrs":"{}", "ports":"", "bg":"#fef9c3", "shape":"roundrectangle", "parent":"n2" } },
 { "data": { "id":"n4", "label":"SpringAPI", "type":"App", "attrs":"{Domain=backend}", "ports":"api_in, db_out, admin_in", "bg":"#1565c0", "shape":"ellipse", "parent":"n3" } },
 { "data": { "id":"n5", "label":"LogSidecar", "type":"App", "attrs":"{Role=logging}", "ports":"log_in", "bg":"#1565c0", "shape":"ellipse", "parent":"n3" } },
 { "data": { "id":"n6", "label":"DatabaseVM", "type":"VM", "attrs":"{Domain=database}", "ports":"", "bg":"#e8eaf6", "shape":"roundrectangle" } },

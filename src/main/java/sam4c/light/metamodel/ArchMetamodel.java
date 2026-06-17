@@ -63,6 +63,7 @@ public final class ArchMetamodel {
                 .attr("health",    MAP,    0, 1)   // {path, port}
                 .attr("trigger",   MAP,    0, 1)   // {kind, source}
                 .attr("placement", MAP,    0, 1)   // {zone, affinity, scope}
+                .attr("spread",    STRING, 0, 1, "none", "host", "zone")   // distribute replicas across failure domains
                 .ref("deployedOn", "Host", false, 0, 1)   // placement (reference, not containment)
                 .build(),
 
@@ -89,6 +90,7 @@ public final class ArchMetamodel {
                 .attr("shareNetwork", BOOLEAN, 0, 1)   // co-located, shared net/storage -> pod
                 .attr("shareStorage", BOOLEAN, 0, 1)
                 .attr("scale",        MAP,     0, 1)   // the group scales as a unit (R-F5)
+                .attr("spread",       STRING,  0, 1, "none", "host", "zone")   // distribute the unit's replicas across failure domains
                 .build(),
             MClass.builder("HostPool").superType("Group").build(),   // a pool of Hosts -> cluster
 

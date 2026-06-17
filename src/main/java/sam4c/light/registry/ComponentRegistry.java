@@ -137,6 +137,7 @@ public class ComponentRegistry {
         if (yaml.get("health") instanceof Map<?, ?> h)     props.put("health", h);
         if (yaml.get("trigger") instanceof Map<?, ?> tg)   props.put("trigger", tg);
         if (yaml.get("placement") instanceof Map<?, ?> pl) props.put("placement", pl);
+        if (yaml.get("spread") != null)     props.put("spread", yaml.get("spread").toString());
         // host property
         if (yaml.get("capacity") instanceof Map<?, ?> cap) props.put("capacity", cap);
         // group properties

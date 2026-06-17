@@ -97,6 +97,7 @@
             "max" : 10,
             "metric" : "cpu"
           },
+          "spread" : "zone",
           "shareNetwork" : true,
           "shareStorage" : false
         }

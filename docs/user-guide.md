@@ -209,6 +209,7 @@ Each component has the following fields:
 | `health` | No | Probe: `{ path, port }` |
 | `trigger` | No | Invocation source: `{ kind: http\|event\|schedule, source }` |
 | `placement` | No | `{ zone, affinity, scope }` |
+| `spread` | No | `none` \| `host` \| `zone` - distribute the unit's replicas across failure domains (different machines / different data centers). Also valid on `Colocation`. |
 
 **Component roles (M2).** Types fall into three roles:
 - **Workloads** — `App` (stateless), `Data` (stateful). They run; carry `runtime`/`exposure`/`scale`/`image`/`deployedOn`.
@@ -662,6 +663,32 @@ Examples:
 Default semantics: **deny by default** - an action is permitted only if an `Authorization` rule grants it (an allowlist, like RBAC/IAM implicit deny).
 
 Real-world mapping: RBAC (Role + RoleBinding), an IAM policy, or an access-control rule allowing `action` from the subject to the resource.
+
+#### Availability
+
+A `target` context must keep a minimum resilience `level`. This is the "A" of the CIA triad: it defends against denial-of-service, resource exhaustion, and single-point-of-failure.
+
+```
+#property Availability(target, level);
+```
+
+`target` is a context; `level` is one of `low`, `medium`, `high`. The levels are defined by what failure the service survives:
+
+| Level | Survives | Requires (in the architecture) |
+|-------|----------|--------------------------------|
+| `low` | nothing | no requirement |
+| `medium` | losing one instance | `scale.replicas >= 2` |
+| `high` | losing a whole data center | `scale.replicas >= 2` and `spread: zone` |
+
+Example:
+
+```
+#property Availability(backendCtx, high);
+```
+
+The tool **verifies** this against the architecture (a semantic check). If a `medium`/`high` target has fewer than 2 copies, or a `high` target is not spread across zones, you get a warning that the requirement is not actually satisfied. Set `scale` and `spread` on the workload (or its `Colocation`) to satisfy it.
+
+Real-world mapping: minimum replicas + a PodDisruptionBudget + topology-spread constraints (Kubernetes), or an Auto Scaling group across multiple Availability Zones (AWS).
 
 ---
 

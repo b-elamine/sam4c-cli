@@ -146,12 +146,18 @@ public final class GraphBuilder {
         }
     }
 
-    /** "  x3" when the component declares scale.replicas (from the properties map), else "". */
+    /**
+     * "  x3" when the component declares scale.replicas, with " - zone" / " - host"
+     * appended when it also declares a spread (so the diagram shows copies fan out).
+     */
     private static String replicaBadge(Component c) {
         Object scale = c.properties().get("scale");
-        if (scale instanceof java.util.Map<?, ?> m && m.get("replicas") != null)
-            return "  x" + m.get("replicas");
-        return "";
+        if (!(scale instanceof java.util.Map<?, ?> m) || m.get("replicas") == null) return "";
+        String badge = "  x" + m.get("replicas");
+        Object spread = c.properties().get("spread");
+        if (spread != null && !"none".equalsIgnoreCase(spread.toString()))
+            badge += " - " + spread;   // e.g. "x3 - zone"
+        return badge;
     }
 
     // Hosts and groups are containers (workloads/components are their children). Security
