@@ -40,17 +40,17 @@ The palette lists the building blocks you can place. Each item is a button; clic
 that element to the canvas. The list comes straight from the model, so it always matches what
 the tool supports.
 
-Element buttons (a "(container)" tag means it can hold other elements inside it):
+Element buttons (a "(holds children)" tag means it can hold other elements inside it):
 
 | Button | Meaning |
 |--------|---------|
 | App    | A stateless service (something that runs and does not keep its own data). |
 | Data   | A stateful store (a database or anything that keeps data). |
 | VM     | A virtual machine that other things run on (a host). |
-| PhysicalMachine | A bare metal host. |
-| ManagedNode | A host the platform gives you and manages. |
+| PM | A physical machine (bare metal host). |
+| Worker | A host the platform gives you and manages. |
 | Zone   | A boundary that groups elements (an isolation or admin area). |
-| CoLocationGroup | A set of elements that run together and share a network (think of a pod). |
+| Colocation | A set of elements that run together and share a network (think of a pod). |
 | HostPool | A group of hosts (a compute pool or cluster). |
 | Connector | A communication channel that components attach to through their ports. |
 
@@ -71,24 +71,34 @@ once; hold Shift and click to add an element to the selection.
 This is where the architecture is drawn. You can:
 
 - Drag elements to move them.
-- Drop a component inside a container (set its parent in the properties panel).
+- Drop a component inside a host or group (set its parent in the properties panel).
 - Click an element to select it and edit it on the right.
 - Draw links between components and connectors (see Draw link above).
 
-Containers (VM, Zone, CoLocationGroup, HostPool, and the other hosts) are drawn as boxes with
+Containers (VM, Zone, Colocation, HostPool, and the other hosts) are drawn as boxes with
 their label at the top, and the elements inside them sit within the box.
 
 ### Properties panel (right column)
 
 When you select an element, this panel shows its editable fields. The fields shown depend on
-the kind of element.
+the kind of element. You never have to remember which fields a type supports: the panel is
+generated from the model definition itself, so the form always shows exactly the fields that
+type can carry, and adding a field to the model makes it appear here automatically.
+
+A field is shown using a widget that matches its type:
+
+- a fixed choice (for example Runtime) is a dropdown of the allowed values,
+- a yes/no field (for example Persistent) is a checkbox,
+- a free text or number field is a text box,
+- a structured field (a map such as Scale or Resources) shows one row per entry, with a "+ ... entry" button that asks for the key,
+- a list field (such as Secrets) shows one row per item, with a "+ ..." button that asks for the value.
 
 Common to all (except connectors):
 
 | Field | Meaning |
 |-------|---------|
 | Name | The element's name. |
-| Inside (container) | A dropdown to put this element inside a container (or leave it at top level). |
+| Inside (host or group) | A dropdown to put this element inside a host or group (or leave it at top level). |
 | Attributes | Free form tags such as `Domain`, `Role`, `DataClass`. Required ones are marked. Use "+ Add" to add a new tag, and "[remove]" to drop one. These tags are what the security rules match against. |
 
 For a workload (App or Data):
@@ -98,9 +108,16 @@ For a workload (App or Data):
 | Runtime | How it is packaged: container, process, or function. |
 | Exposure | How reachable it is: none, internal, or external. |
 | Lifecycle | How it runs: continuous, batch, or scheduled. |
+| Schedule | The cron expression, when Lifecycle is scheduled. |
 | Image | The artifact or image it runs, for example `registry/api:1.4`. |
+| Scale | A map. Common keys: `replicas`, `min`, `max`, `metric`. |
+| Resources | A map of requested resources, for example `cpu`, `memory`. |
+| Config | A map of configuration values (key to value). |
+| Secrets | A list of secret names the workload needs. |
+| Health | A map describing the health check, for example `path`, `port`. |
+| Trigger | A map describing what invokes the workload, for example `kind`, `source`. |
+| Placement | A map of placement hints, for example `zone`, `affinity`, `scope`. |
 | Deployed on (host) | A dropdown to place this workload on a specific host. |
-| Scale (replicas / min / max) | How many copies, and the autoscaling range. |
 | Ports | One row per port, each with a name, a port number, and a protocol. Use "+ port" to add a row and the "x" to remove one. |
 
 For a Data element, two extra fields:
@@ -108,15 +125,15 @@ For a Data element, two extra fields:
 | Field | Meaning |
 |-------|---------|
 | Persistent | Tick if the data must survive restarts. |
-| Storage (size / class) | The disk size and storage class. |
+| Storage | A map describing the disk, for example `size`, `class`. |
 
-For a CoLocationGroup:
+For a Colocation:
 
 | Field | Meaning |
 |-------|---------|
 | Share network | Tick if the members share one network. |
 | Share storage | Tick if the members share storage. |
-| Scale (replicas / min / max) | The group scales as one unit. |
+| Scale | A map. The group scales as one unit. |
 
 For a Zone: a Boundary field (the boundary name or level).
 
@@ -135,9 +152,10 @@ Buttons at the bottom of the panel:
 | Delete | Removes the selected element. |
 | + Add  | Adds a new attribute (tag) row. |
 | + port | Adds a new port row (workloads). |
+| + ... entry / + ... | Adds a row to a map or list field (asks for the key or value). |
 
-Note: clicking "+ Add", "+ port", or "[remove]" keeps everything else you already typed; you
-do not lose unsaved edits.
+Note: clicking any of the "+" buttons or "[remove]" keeps everything else you already typed;
+you do not lose unsaved edits.
 
 ### Bottom action bar
 
@@ -193,7 +211,7 @@ graph on the right.
 
 ### The graph
 
-- Components are nodes; containers (VMs, zones, pods) are boxes around their children.
+- Components are nodes; hosts and groups (VMs, zones, co-location groups) are boxes around their children.
 - Grey lines are the architecture topology (which component connects to which connector), with
   arrows showing the flow direction and the port name as the label.
 - Coloured lines are the security rules (blue Confidentiality, green Integrity, red dashed
@@ -228,8 +246,8 @@ These only act on the canvas, and never while you are typing in a field.
 |------|---------------|
 | Component | Any element you place: a workload, a host, or a group. |
 | Workload  | Something that runs: App (stateless) or Data (stateful). |
-| Host      | Something workloads run on: VM, PhysicalMachine, ManagedNode. |
-| Group     | Something that contains elements: Zone, CoLocationGroup, HostPool. |
+| Host      | Something workloads run on: VM, PM, Worker. |
+| Group     | Something that contains elements: Zone, Colocation, HostPool. |
 | Connector | A communication channel between components. |
 | Port      | A named connection point on a component, with a number and protocol. |
 | Link      | A wire from a component's port to a connector, with a direction. |

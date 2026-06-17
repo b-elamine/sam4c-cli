@@ -78,23 +78,21 @@ public final class ArchYamlWriter {
             }
         }
 
-        // Deployment properties from the properties map
-        writeScalar(sb, pad, "image", c.properties().get("image"));
-        writeScalar(sb, pad, "runtime", c.properties().get("runtime"));
-        writeScalar(sb, pad, "exposure", c.properties().get("exposure"));
-        writeScalar(sb, pad, "lifecycle", c.properties().get("lifecycle"));
-        writeScalar(sb, pad, "schedule", c.properties().get("schedule"));
-        writeScalar(sb, pad, "persistent", c.properties().get("persistent"));
-        writeScalar(sb, pad, "deployedOn", c.properties().get("deployedOn"));
-        writeNestedMap(sb, pad, "scale", c.properties().get("scale"));
-        writeNestedMap(sb, pad, "resources", c.properties().get("resources"));
-        writeNestedMap(sb, pad, "storage", c.properties().get("storage"));
-        writeNestedMap(sb, pad, "config", c.properties().get("config"));
-        writeNestedMap(sb, pad, "health", c.properties().get("health"));
-        writeNestedMap(sb, pad, "trigger", c.properties().get("trigger"));
-        writeNestedMap(sb, pad, "placement", c.properties().get("placement"));
-        writeNestedMap(sb, pad, "capacity", c.properties().get("capacity"));
-        writeList(sb, pad, "secrets", c.properties().get("secrets"));
+        // Deployment properties: the set of fields and their kinds is read from the M2
+        // metamodel (single source of truth), so any field declared on the type is
+        // serialized automatically -- no per-field list to keep in sync.
+        writeScalar(sb, pad, "deployedOn", c.properties().get("deployedOn"));   // a reference, not an attribute
+        for (sam4c.light.metamodel.MAttribute a : sam4c.light.metamodel.Sam4cMetamodel.INSTANCE.allAttributes(c.type())) {
+            String key = a.name();
+            if (key.equals("type") || key.equals("name") || key.equals("external")) continue;  // handled above
+            Object v = c.properties().get(key);
+            if (v == null) continue;
+            switch (a.type()) {
+                case MAP  -> writeNestedMap(sb, pad, key, v);
+                case LIST -> writeList(sb, pad, key, v);
+                default   -> writeScalar(sb, pad, key, v);
+            }
+        }
 
         if (!c.children().isEmpty()) {
             sb.append(pad).append("  children:\n");

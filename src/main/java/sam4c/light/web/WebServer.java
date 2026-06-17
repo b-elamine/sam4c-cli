@@ -40,6 +40,7 @@ public final class WebServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/", this::handleRoot);
         server.createContext("/api/palette", this::handlePalette);
+        server.createContext("/api/schema", this::handleSchema);
         server.createContext("/api/diagram-to-yaml", ex -> handleDiagram(ex, true));
         server.createContext("/api/diagram-to-secdsl", ex -> handleDiagram(ex, false));
         server.createContext("/api/merge", this::handleMerge);
@@ -58,6 +59,11 @@ public final class WebServer {
     private void handlePalette(HttpExchange ex) throws IOException {
         if (!"GET".equals(ex.getRequestMethod())) { send(ex, 405, "application/json", "{\"error\":\"GET only\"}"); return; }
         send(ex, 200, "application/json", Palette.json());
+    }
+
+    private void handleSchema(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { send(ex, 405, "application/json", "{\"error\":\"GET only\"}"); return; }
+        send(ex, 200, "application/json", Schema.json());
     }
 
     @SuppressWarnings("unchecked")

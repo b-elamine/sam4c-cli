@@ -48,44 +48,58 @@ public final class ArchMetamodel {
                 .build(),
 
             // Workload (abstract): something that RUNS. Carries deployment semantics.
+            // Every editable field is declared here -> the loader, conformance, Studio form,
+            // and serializer all derive from these declarations (single source of truth).
             MClass.builder("Workload").abstractClass().superType("Component")
-                .attr("runtime",   STRING, 0, 1)   // container | process | function
-                .attr("exposure",  STRING, 0, 1)   // none | internal | external
-                .attr("lifecycle", STRING, 0, 1)   // continuous | batch | scheduled (platform-neutral)
+                .attr("runtime",   STRING, 0, 1, "container", "process", "function")
+                .attr("exposure",  STRING, 0, 1, "none", "internal", "external")
+                .attr("lifecycle", STRING, 0, 1, "continuous", "batch", "scheduled")
                 .attr("schedule",  STRING, 0, 1)   // cron expression (when lifecycle=scheduled)
+                .attr("image",     STRING, 0, 1)   // artifact/image reference
+                .attr("scale",     MAP,    0, 1)   // {replicas, min, max, metric}
+                .attr("resources", MAP,    0, 1)   // {cpu, memory}
+                .attr("config",    MAP,    0, 1)   // {KEY: value}
+                .attr("secrets",   LIST,   0, 1)   // [NAME] references
+                .attr("health",    MAP,    0, 1)   // {path, port}
+                .attr("trigger",   MAP,    0, 1)   // {kind, source}
+                .attr("placement", MAP,    0, 1)   // {zone, affinity, scope}
                 .ref("deployedOn", "Host", false, 0, 1)   // placement (reference, not containment)
                 .build(),
 
             MClass.builder("App") .superType("Workload").build(),   // stateless
             MClass.builder("Data").superType("Workload")            // stateful
                 .attr("persistent", BOOLEAN, 0, 1)
+                .attr("storage",    MAP,     0, 1)   // {size, class}
                 .build(),
 
             // Host (abstract): something workloads RUN ON.
-            MClass.builder("Host").abstractClass().superType("Component").build(),
+            MClass.builder("Host").abstractClass().superType("Component")
+                .attr("capacity", MAP, 0, 1)   // {cpu, memory}
+                .build(),
             MClass.builder("VM")             .superType("Host").build(),
-            MClass.builder("PhysicalMachine").superType("Host").build(),
-            MClass.builder("ManagedNode")    .superType("Host").build(),
+            MClass.builder("PM").superType("Host").build(),
+            MClass.builder("Worker")    .superType("Host").build(),
 
             // Group (abstract): CONTAINS components (via the children tree -> single parent).
             MClass.builder("Group").abstractClass().superType("Component").build(),
             MClass.builder("Zone").superType("Group")
                 .attr("boundary", STRING, 0, 1)        // logical/isolation boundary -> namespace/VPC
                 .build(),
-            MClass.builder("CoLocationGroup").superType("Group")
+            MClass.builder("Colocation").superType("Group")
                 .attr("shareNetwork", BOOLEAN, 0, 1)   // co-located, shared net/storage -> pod
                 .attr("shareStorage", BOOLEAN, 0, 1)
+                .attr("scale",        MAP,     0, 1)   // the group scales as a unit (R-F5)
                 .build(),
             MClass.builder("HostPool").superType("Group").build(),   // a pool of Hosts -> cluster
 
             MClass.builder("Port").superType("ContextualElement")
                 .attr("number",   INT,    0, 1)
-                .attr("protocol", STRING, 0, 1)   // tcp | udp | http | grpc
+                .attr("protocol", STRING, 0, 1, "tcp", "udp", "http", "grpc")
                 .build(),
 
             MClass.builder("Connector").superType("ElementApp")
                 .attr("external", BOOLEAN, 0, 1)
-                .attr("protocol", STRING,  0, 1)   // tcp | udp | http | grpc (encryption is a security concern, not here)
+                .attr("protocol", STRING,  0, 1, "tcp", "udp", "http", "grpc")
                 .build(),
 
             MClass.builder("Link")

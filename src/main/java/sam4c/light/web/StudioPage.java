@@ -92,6 +92,7 @@ function showStage(n) {
 // ---------------- Stage 1: canvas editor ----------------
 let editorCy = null;
 let palette = [];
+let schema = {};   // per-type editable field descriptors, fetched from /api/schema (metamodel-derived)
 let seq = 0;
 let selectedId = null;
 let linkMode = false;
@@ -113,10 +114,10 @@ function editorStyle() {
 }
 
 function colorFor(type) {
-  const hosts = ['VM','PhysicalMachine','ManagedNode'];
+  const hosts = ['VM','PM','Worker'];
   if (hosts.includes(type)) return '#e8eaf6';
   if (type==='Zone') return '#f1f5f9';
-  if (type==='CoLocationGroup') return '#fef9c3';
+  if (type==='Colocation') return '#fef9c3';
   if (type==='HostPool') return '#eef2ff';
   if (type==='App') return '#1565c0';
   if (type==='Data') return '#e65100';
@@ -125,8 +126,8 @@ function colorFor(type) {
 function shapeFor(type) { return (type==='App')?'ellipse':(type==='Data')?'barrel':(type==='Connector')?'diamond':'roundrectangle'; }
 
 // type classification (mirrors the metamodel roles)
-const HOST_TYPES = ['VM','PhysicalMachine','ManagedNode'];
-const GROUP_TYPES = ['Zone','CoLocationGroup','HostPool'];
+const HOST_TYPES = ['VM','PM','Worker'];
+const GROUP_TYPES = ['Zone','Colocation','HostPool'];
 function isHostType(t){ return HOST_TYPES.includes(t); }
 function isGroupType(t){ return GROUP_TYPES.includes(t); }
 function isContainerType(t){ return isHostType(t) || isGroupType(t); }
@@ -143,12 +144,13 @@ function setOrDel(n, key, val){ if(val!==undefined && val!==null && val!=='') n.
 async function initEditor() {
   const res = await fetch('/api/palette');
   palette = await res.json();
+  schema = await (await fetch('/api/schema')).json();   // metamodel-derived editable fields per type
   const pal = document.getElementById('palette-items');
   pal.innerHTML = '';
   palette.forEach(p => {
     const b = document.createElement('button');
     b.className = 'pal-item';
-    b.textContent = '+ ' + p.type + (p.container ? '  (container)' : '');
+    b.textContent = '+ ' + p.type + (p.container ? '  (holds children)' : '');
     b.onclick = () => addNode(p);
     pal.appendChild(b);
   });
@@ -197,7 +199,7 @@ function addNode(p) {
   const id = 'x' + (seq++);
   const isConn = p.kind === 'connector';
   const data = { id: id, name: p.type + seq, type: p.type, kind: isConn ? 'Connector' : (p.container ? 'VM' : 'leaf'),
-                 bg: colorFor(p.type), shape: shapeFor(p.type), attrs: {}, ports: [], external: false };
+                 bg: colorFor(p.type), shape: shapeFor(p.type), attrs: {}, ports: [] };
   // pre-seed required attribute keys so the user just fills values
   (p.requiredAttrs || []).forEach(k => data.attrs[k] = '');
   editorCy.add({ group: 'nodes', data: data, position: { x: 120 + Math.random()*300, y: 120 + Math.random()*250 } });
@@ -211,67 +213,87 @@ function selectNode(id) {
   renderProps();
 }
 
+// Render a single metamodel field by its kind. The schema (from /api/schema) is the single
+// source of truth: add a field to the M2 metamodel and it appears here automatically.
+function fieldWidget(f, d) {
+  const v = d[f.name];
+  const req = f.required ? ' <span class="req">*required</span>' : '';
+  const lbl = '<label>' + f.name + req + '</label>';
+  if (f.kind === 'bool')
+    return lbl + '<input type="checkbox" data-f="' + f.name + '" data-k="bool"' + (v ? ' checked' : '') + '>';
+  if (f.kind === 'enum')
+    return lbl + '<select data-f="' + f.name + '" data-k="enum">' + optionList(f.allowed || [], v) + '</select>';
+  if (f.kind === 'int')
+    return lbl + '<input data-f="' + f.name + '" data-k="int" value="' + (v ?? '') + '">';
+  if (f.kind === 'string')
+    return lbl + '<input data-f="' + f.name + '" data-k="string" value="' + (v || '') + '">';
+  if (f.kind === 'map') {
+    const m = v || {};
+    let h = lbl;
+    Object.keys(m).forEach(k => {
+      h += '<div style="display:flex;gap:3px;margin:2px 0;align-items:center">'
+         + '<span style="flex:1;font-size:11px;color:var(--muted)">' + k + '</span>'
+         + '<input data-mapval="' + f.name + '" data-mk="' + k + '" value="' + (m[k] ?? '') + '" style="flex:1">'
+         + '<span style="cursor:pointer;color:var(--danger);padding:0 4px" onclick="removeMapEntry(\\'' + f.name + '\\',\\'' + k + '\\')">&times;</span></div>';
+    });
+    h += '<button class="act-btn secondary" onclick="addMapEntry(\\'' + f.name + '\\')">+ ' + f.name + ' entry</button>';
+    return h;
+  }
+  if (f.kind === 'list') {
+    const arr = v || [];
+    let h = lbl;
+    arr.forEach((item, i) => {
+      h += '<div style="display:flex;gap:3px;margin:2px 0;align-items:center">'
+         + '<span style="flex:1;font-size:12px">' + item + '</span>'
+         + '<span style="cursor:pointer;color:var(--danger);padding:0 4px" onclick="removeListItem(\\'' + f.name + '\\',' + i + ')">&times;</span></div>';
+    });
+    h += '<button class="act-btn secondary" onclick="addListItem(\\'' + f.name + '\\')">+ ' + f.name + '</button>';
+    return h;
+  }
+  return '';
+}
+
 function renderProps() {
   const box = document.getElementById('props-body');
   if (!selectedId) { box.innerHTML = '<p style="color:var(--muted);font-size:12px">Select a node, or add one from the palette.</p>'; return; }
   const n = editorCy.getElementById(selectedId);
   const d = n.data();
   const t = d.type;
-  const sc = d.scale || {};
   let html = '<label>Name</label><input id="p-name" value="' + (d.name||'') + '">';
 
-  if (isConnectorType(t)) {
-    html += '<label>External</label> <input type="checkbox" id="p-ext"' + (d.external?' checked':'') + '>';
-    html += '<label>Protocol</label><select id="p-protocol">' + optionList(['tcp','udp','http','grpc'], d.protocol) + '</select>';
-  } else {
-    // parent (nesting) -- any container (host or group)
-    html += '<label>Inside (container)</label><select id="p-parent"><option value="">(top level)</option>';
+  // parent (nesting) -- any container (host or group); connectors are not contained
+  if (!isConnectorType(t)) {
+    html += '<label>Inside (host or group)</label><select id="p-parent"><option value="">(top level)</option>';
     editorCy.nodes().forEach(o => { if (o.id() !== selectedId && isContainerType(o.data('type'))) {
       const sel = (n.data('parent') === o.id()) ? ' selected' : '';
       html += '<option value="' + o.id() + '"' + sel + '>' + o.data('name') + '</option>';
     }});
     html += '</select>';
+  }
 
-    if (isWorkloadType(t)) {
-      html += '<label>Runtime</label><select id="p-runtime">' + optionList(['container','process','function'], d.runtime) + '</select>';
-      html += '<label>Exposure</label><select id="p-exposure">' + optionList(['none','internal','external'], d.exposure) + '</select>';
-      html += '<label>Lifecycle</label><select id="p-lifecycle">' + optionList(['continuous','batch','scheduled'], d.lifecycle) + '</select>';
-      html += '<label>Image</label><input id="p-image" value="' + (d.image||'') + '">';
-      html += '<label>Deployed on (host)</label><select id="p-deployedOn"><option value="">(none)</option>';
-      editorCy.nodes().forEach(o => { if (isHostType(o.data('type'))) {
-        html += '<option' + (d.deployedOn===o.data('name')?' selected':'') + '>' + o.data('name') + '</option>'; }});
-      html += '</select>';
-      html += '<label>Scale (replicas / min / max)</label><div style="display:flex;gap:4px">'
-            + '<input id="p-replicas" placeholder="rep" value="'+(sc.replicas??'')+'">'
-            + '<input id="p-min" placeholder="min" value="'+(sc.min??'')+'">'
-            + '<input id="p-max" placeholder="max" value="'+(sc.max??'')+'"></div>';
-      if (t==='Data') {
-        const st = d.storage || {};
-        html += '<label>Persistent</label> <input type="checkbox" id="p-persistent"'+(d.persistent?' checked':'')+'>';
-        html += '<label>Storage (size / class)</label><div style="display:flex;gap:4px">'
-              + '<input id="p-stsize" placeholder="size" value="'+(st.size||'')+'">'
-              + '<input id="p-stclass" placeholder="class" value="'+(st['class']||'')+'"></div>';
-      }
-      html += '<h3 style="margin-top:14px">Ports</h3>';
-      (d.ports||[]).forEach((p,i) => {
-        html += '<div style="display:flex;gap:3px;margin:2px 0">'
-              + '<input data-pn="'+i+'" placeholder="name" value="'+(p.name||'')+'" style="flex:2">'
-              + '<input data-pnum="'+i+'" placeholder="port" value="'+(p.number??'')+'" style="flex:1">'
-              + '<select data-pp="'+i+'" style="flex:1">'+optionList(['tcp','udp','http','grpc'],p.protocol)+'</select>'
-              + '<span style="cursor:pointer;color:var(--danger);padding:4px" onclick="removePort('+i+')">&times;</span></div>';
-      });
-      html += '<button class="act-btn secondary" onclick="addPort()">+ port</button>';
-    }
-    if (t==='CoLocationGroup') {
-      html += '<label>Share network</label> <input type="checkbox" id="p-sharenet"'+(d.shareNetwork?' checked':'')+'>';
-      html += '<label>Share storage</label> <input type="checkbox" id="p-sharesto"'+(d.shareStorage?' checked':'')+'>';
-      html += '<label>Scale (replicas / min / max)</label><div style="display:flex;gap:4px">'
-            + '<input id="p-replicas" placeholder="rep" value="'+(sc.replicas??'')+'">'
-            + '<input id="p-min" placeholder="min" value="'+(sc.min??'')+'">'
-            + '<input id="p-max" placeholder="max" value="'+(sc.max??'')+'"></div>';
-    }
-    if (t==='Zone') html += '<label>Boundary</label><input id="p-boundary" value="'+(d.boundary||'')+'">';
+  // metamodel-driven fields for this type (single source of truth)
+  (schema[t] || []).forEach(f => { html += fieldWidget(f, d); });
 
+  // deployedOn is a REFERENCE (host placement), resolved against live host nodes -> kept structural
+  if (isWorkloadType(t)) {
+    html += '<label>Deployed on (host)</label><select id="p-deployedOn"><option value="">(none)</option>';
+    editorCy.nodes().forEach(o => { if (isHostType(o.data('type'))) {
+      html += '<option' + (d.deployedOn===o.data('name')?' selected':'') + '>' + o.data('name') + '</option>'; }});
+    html += '</select>';
+
+    html += '<h3 style="margin-top:14px">Ports</h3>';
+    (d.ports||[]).forEach((p,i) => {
+      html += '<div style="display:flex;gap:3px;margin:2px 0">'
+            + '<input data-pn="'+i+'" placeholder="name" value="'+(p.name||'')+'" style="flex:2">'
+            + '<input data-pnum="'+i+'" placeholder="port" value="'+(p.number??'')+'" style="flex:1">'
+            + '<select data-pp="'+i+'" style="flex:1">'+optionList(['tcp','udp','http','grpc'],p.protocol)+'</select>'
+            + '<span style="cursor:pointer;color:var(--danger);padding:4px" onclick="removePort('+i+')">&times;</span></div>';
+    });
+    html += '<button class="act-btn secondary" onclick="addPort()">+ port</button>';
+  }
+
+  // free-form classification attributes (the security bridge) -- not in the architecture schema
+  if (!isConnectorType(t)) {
     html += '<h3 style="margin-top:14px">Attributes</h3>';
     const req = (palette.find(p => p.type === t) || {}).requiredAttrs || [];
     const keys = new Set([...req, ...Object.keys(d.attrs||{})]);
@@ -298,15 +320,31 @@ function captureForm() {
   if (!n) return null;
   const t = n.data('type');
   const val = id => { const e = document.getElementById(id); return e ? e.value.trim() : undefined; };
-  const chk = id => { const e = document.getElementById(id); return e ? e.checked : undefined; };
 
   const nm = val('p-name'); if (nm !== undefined) n.data('name', nm);
 
-  if (isConnectorType(t)) {
-    const ext = chk('p-ext'); if (ext !== undefined) n.data('external', ext);
-    setOrDel(n, 'protocol', val('p-protocol'));
-    return n;
-  }
+  // metamodel-driven fields (same loop as renderProps, in reverse)
+  (schema[t] || []).forEach(f => {
+    if (f.kind === 'bool') {
+      const e = document.querySelector('#props-body input[data-f="' + f.name + '"]');
+      if (e && e.checked) n.data(f.name, true); else n.removeData(f.name);
+    } else if (f.kind === 'map') {
+      const m = {};
+      document.querySelectorAll('#props-body input[data-mapval="' + f.name + '"]').forEach(inp => {
+        const v = inp.value.trim(); if (v !== '') m[inp.getAttribute('data-mk')] = numIfPossible(v);
+      });
+      if (Object.keys(m).length) n.data(f.name, m); else n.removeData(f.name);
+    } else if (f.kind === 'list') {
+      // list items are not edited in place (added/removed only) -> keep current node data as-is
+    } else {  // enum | string | int
+      const e = document.querySelector('#props-body [data-f="' + f.name + '"]');
+      let v = e ? e.value.trim() : '';
+      if (f.kind === 'int' && v !== '') { const x = parseInt(v); v = isNaN(x) ? '' : x; }
+      setOrDel(n, f.name, v);
+    }
+  });
+
+  if (isConnectorType(t)) return n;
 
   const attrs = {};
   document.querySelectorAll('#props-body input[data-attr]').forEach(inp => {
@@ -315,36 +353,14 @@ function captureForm() {
   n.data('attrs', attrs);
 
   if (isWorkloadType(t)) {
-    setOrDel(n, 'runtime',   val('p-runtime'));
-    setOrDel(n, 'exposure',  val('p-exposure'));
-    setOrDel(n, 'lifecycle', val('p-lifecycle'));
-    setOrDel(n, 'image',     val('p-image'));
     setOrDel(n, 'deployedOn', val('p-deployedOn'));
-    captureScale(n);
     capturePorts(n);
-    if (t === 'Data') {
-      if (chk('p-persistent')) n.data('persistent', true); else n.removeData('persistent');
-      const size = val('p-stsize'), cls = val('p-stclass');
-      if (size || cls) { const st = {}; if (size) st.size = size; if (cls) st['class'] = cls; n.data('storage', st); }
-      else n.removeData('storage');
-    }
   }
-  if (t === 'CoLocationGroup') {
-    if (chk('p-sharenet')) n.data('shareNetwork', true); else n.removeData('shareNetwork');
-    if (chk('p-sharesto')) n.data('shareStorage', true); else n.removeData('shareStorage');
-    captureScale(n);
-  }
-  if (t === 'Zone') setOrDel(n, 'boundary', val('p-boundary'));
   return n;
 }
 
-function captureScale(n) {
-  const num = id => { const e = document.getElementById(id); if (!e || !e.value.trim()) return undefined; const x = parseInt(e.value.trim()); return isNaN(x) ? undefined : x; };
-  const r = num('p-replicas'), mn = num('p-min'), mx = num('p-max');
-  if (r === undefined && mn === undefined && mx === undefined) { n.removeData('scale'); return; }
-  const sc = {}; if (r !== undefined) sc.replicas = r; if (mn !== undefined) sc.min = mn; if (mx !== undefined) sc.max = mx;
-  n.data('scale', sc);
-}
+// map values that look like integers are stored as numbers (e.g. scale.replicas: 3)
+function numIfPossible(v) { return (/^-?\\d+$/.test(v)) ? parseInt(v) : v; }
 
 function capturePorts(n) {
   const rows = {};
@@ -386,6 +402,42 @@ function removePort(i) {
   renderProps();
 }
 
+// generic map-field editing (scale, resources, storage, config, health, trigger, placement, capacity)
+function addMapEntry(field) {
+  const n = captureForm();
+  const key = (prompt('Key for "' + field + '" (e.g. replicas, cpu, size):', '') || '').trim();
+  if (!key) return;
+  const m = Object.assign({}, n.data(field) || {});
+  if (!(key in m)) m[key] = '';
+  n.data(field, m);
+  renderProps();
+}
+function removeMapEntry(field, key) {
+  const n = captureForm();
+  const m = Object.assign({}, n.data(field) || {});
+  delete m[key];
+  if (Object.keys(m).length) n.data(field, m); else n.removeData(field);
+  renderProps();
+}
+
+// generic list-field editing (secrets)
+function addListItem(field) {
+  const n = captureForm();
+  const v = (prompt('Add to "' + field + '":', '') || '').trim();
+  if (!v) return;
+  const arr = (n.data(field) || []).slice();
+  arr.push(v);
+  n.data(field, arr);
+  renderProps();
+}
+function removeListItem(field, i) {
+  const n = captureForm();
+  const arr = (n.data(field) || []).slice();
+  arr.splice(i, 1);
+  if (arr.length) n.data(field, arr); else n.removeData(field);
+  renderProps();
+}
+
 function applyProps() {
   const n = captureForm();
   if (!n) return;
@@ -412,7 +464,7 @@ function toggleLinkMode() {
 function handleLinkClick(node) {
   // First click: remember whatever was clicked (workload OR connector).
   if (!linkSource) {
-    if (isContainerType(node.data('type'))) { setMsg('Links attach to App/Data components or connectors, not containers.', 'error'); return; }
+    if (isContainerType(node.data('type'))) { setMsg('Links attach to App/Data components or connectors, not hosts or groups.', 'error'); return; }
     linkSource = node; node.addClass('sel');
     setMsg('now click the other end (the ' + (isConnectorType(node.data('type')) ? 'component' : 'connector') + ')', '');
     return;
@@ -458,17 +510,18 @@ function handleLinkClick(node) {
 // editorCy -> diagram domain structure
 function serializeDiagram() {
   const components = [], connectors = [], links = [];
-  const DEPLOY_KEYS = ['runtime','exposure','lifecycle','image','deployedOn','scale','persistent','storage','shareNetwork','shareStorage','boundary'];
   editorCy.nodes().forEach(n => {
     const d = n.data();
+    const fields = schema[d.type] || [];   // metamodel-declared fields for this type
     if (isConnectorType(d.type)) {
-      const c = { name: d.name, external: !!d.external };
-      if (d.protocol) c.protocol = d.protocol;
+      const c = { name: d.name };
+      fields.forEach(f => { if (d[f.name] !== undefined) c[f.name] = d[f.name]; });
       connectors.push(c);
     } else {
       const comp = { id: d.id, name: d.name, type: d.type, parent: n.data('parent') || null,
                      attributes: d.attrs || {}, ports: d.ports || [] };
-      DEPLOY_KEYS.forEach(k => { if (d[k] !== undefined) comp[k] = d[k]; });
+      fields.forEach(f => { if (d[f.name] !== undefined) comp[f.name] = d[f.name]; });
+      if (d.deployedOn) comp.deployedOn = d.deployedOn;   // reference, not a schema attribute
       components.push(comp);
     }
   });

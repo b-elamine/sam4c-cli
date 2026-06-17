@@ -199,7 +199,7 @@ Each component has the following fields:
 | `attributes` | No | Key-value map used by the merger to evaluate security context predicates. A component with `Domain: frontend` will be matched by any context that contains `(Domain=frontend)` |
 | `runtime` | No | How a workload is packaged: `container` \| `process` \| `function` |
 | `exposure` | No | Reachability: `none` \| `internal` \| `external` |
-| `deployedOn` | No | Name of a Host (VM/PhysicalMachine/ManagedNode) this workload runs on (placement) |
+| `deployedOn` | No | Name of a Host (VM/PM/Worker) this workload runs on (placement) |
 | `image` | No | Artifact/image the component runs, e.g. `registry/api:1.4.2` (deployment property) |
 | `scale` | No | Replication/autoscaling: `{ replicas, min, max, metric }` |
 | `resources` | No | Resource requests: `{ cpu, memory }` |
@@ -212,17 +212,17 @@ Each component has the following fields:
 
 **Component roles (M2).** Types fall into three roles:
 - **Workloads** — `App` (stateless), `Data` (stateful). They run; carry `runtime`/`exposure`/`scale`/`image`/`deployedOn`.
-- **Hosts** — `VM`, `PhysicalMachine`, `ManagedNode`. Workloads run on them (`deployedOn`).
-- **Groups** — `Zone` (boundary), `CoLocationGroup` (co-located, `shareNetwork`/`shareStorage`), `HostPool` (pool of hosts). They **contain** child components (via `children`).
+- **Hosts** — `VM`, `PM`, `Worker`. Workloads run on them (`deployedOn`).
+- **Groups** — `Zone` (boundary), `Colocation` (co-located, `shareNetwork`/`shareStorage`), `HostPool` (pool of hosts). They **contain** child components (via `children`).
 
 `runtime`/`exposure` values and `deployedOn` (must name a real Host) are validated. Group
-containment is validated too: a `CoLocationGroup` may hold only Workloads, a `HostPool` only
+containment is validated too: a `Colocation` may hold only Workloads, a `HostPool` only
 Hosts, a `Zone` not a Host directly. Placement (`deployedOn`, a reference) is kept separate from
 grouping (`children`). Example of co-location:
 
 ```yaml
 - name: api-pod
-  type: CoLocationGroup
+  type: Colocation
   shareNetwork: true
   children:
     - name: api
@@ -551,7 +551,7 @@ A security property expresses a security requirement between contexts. The gener
 #property PropertyName(arg1, arg2, ...) -> optional_target ;
 ```
 
-There are four built-in properties.
+There are five built-in properties.
 
 ---
 
@@ -639,6 +639,29 @@ Examples:
 ```
 
 Real-world mapping: IAM role check, mTLS client certificate validation, API key gate, OAuth token verification on the target endpoint.
+
+---
+
+#### Authorization
+
+A `subject` may perform one or more `actions` on a `resource`. Authentication answers "who are you"; Authorization answers "what may you do" once in.
+
+```
+#property Authorization(subject, resource, action [, action ...]);
+```
+
+`subject` and `resource` are contexts; the remaining arguments are action names (`read`, `write`, `admin`, ...). At least one action is required; list several to grant them together.
+
+Examples:
+
+```
+#property Authorization(adminRoleCtx, dbCtx, read, write);
+#property Authorization((Role=clinician), clinicalDataCtx, read);
+```
+
+Default semantics: **deny by default** - an action is permitted only if an `Authorization` rule grants it (an allowlist, like RBAC/IAM implicit deny).
+
+Real-world mapping: RBAC (Role + RoleBinding), an IAM policy, or an access-control rule allowing `action` from the subject to the resource.
 
 ---
 
