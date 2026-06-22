@@ -49,6 +49,9 @@ public class Main implements Callable<Integer> {
     @Option(names = {"--validate"}, description = "Print resolution report and exit without writing output")
     private boolean validateOnly;
 
+    @Option(names = {"--strict"}, description = "Treat semantic warnings (unmet/violated security rules) as failures: exit non-zero and write nothing")
+    private boolean strict;
+
     @Option(names = {"--html"}, description = "Generate an interactive HTML graph from the in-memory object graph")
     private boolean generateHtml;
 
@@ -130,6 +133,14 @@ public class Main implements Callable<Integer> {
             if (!unified.unresolved().isEmpty()) {
                 System.err.println("\nWARNING: " + unified.unresolved().size()
                         + " unresolved reference(s). Check names in your .secdsl file.");
+            }
+
+            // --strict: a security warning or an unresolved ref blocks (write nothing, fail)
+            if (strict && (!result.warnings().isEmpty() || !unified.unresolved().isEmpty())) {
+                System.err.println("\nFAILED (--strict): " + result.warnings().size()
+                        + " semantic warning(s), " + unified.unresolved().size()
+                        + " unresolved reference(s). No output written.");
+                return 1;
             }
 
             if (validateOnly) return unified.unresolved().isEmpty() ? 0 : 1;

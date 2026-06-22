@@ -114,11 +114,8 @@ public class ComponentRegistry {
         return v instanceof Boolean b && b;
     }
 
-    /**
-     * Deployment properties carried in the untyped `properties` map (the "fast path":
-     * generation-relevant data the generator reads, without first-class metamodel classes).
-     * Currently: image (string), scale + resources (nested maps). Extend by adding keys here.
-     */
+    // reads the deployment fields into the untyped properties map. add a key here when a
+    // new field is declared on the metamodel.
     public static Map<String, Object> loadProperties(Map<String, Object> yaml) {
         Map<String, Object> props = new LinkedHashMap<>();
         // workload deployment properties

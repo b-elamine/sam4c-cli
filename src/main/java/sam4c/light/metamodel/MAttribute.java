@@ -2,13 +2,8 @@ package sam4c.light.metamodel;
 
 import java.util.List;
 
-/**
- * A scalar (or small structured) feature of an MClass.
- *
- * @param allowed  for a STRING field, the closed set of permitted values (an enum);
- *                 empty means free-form. Lets the metamodel describe enums so the
- *                 form, conformance, and docs all derive from one declaration.
- */
+// A field on an MClass. `allowed` is the value set for an enum STRING field
+// (empty means free text).
 public record MAttribute(
         String name,
         MDataType type,
@@ -16,7 +11,7 @@ public record MAttribute(
         int upperBound,
         List<String> allowed
 ) {
-    /** Convenience: a field with no enum constraint. */
+    // no enum constraint
     public MAttribute(String name, MDataType type, int lowerBound, int upperBound) {
         this(name, type, lowerBound, upperBound, List.of());
     }

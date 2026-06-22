@@ -8,13 +8,8 @@ import sam4c.light.model.Port;
 
 import java.util.Map;
 
-/**
- * Serializes an Architecture back to .arch.yaml text.
- *
- * The inverse of ArchLoader: ArchLoader reads YAML -> Architecture, this writes
- * Architecture -> YAML. Used by the web editor's "Download YAML" so a drawn
- * diagram round-trips into the same format the CLI consumes.
- */
+// Writes an Architecture back out as .arch.yaml (inverse of the loader). Used by the
+// Studio's "Download YAML" so a drawing round-trips to the format the CLI reads.
 public final class ArchYamlWriter {
 
     private ArchYamlWriter() {}
@@ -78,9 +73,8 @@ public final class ArchYamlWriter {
             }
         }
 
-        // Deployment properties: the set of fields and their kinds is read from the M2
-        // metamodel (single source of truth), so any field declared on the type is
-        // serialized automatically -- no per-field list to keep in sync.
+        // walk the type's metamodel attributes so any declared field gets written,
+        // no hand-maintained list to keep in sync
         writeScalar(sb, pad, "deployedOn", c.properties().get("deployedOn"));   // a reference, not an attribute
         for (sam4c.light.metamodel.MAttribute a : sam4c.light.metamodel.Sam4cMetamodel.INSTANCE.allAttributes(c.type())) {
             String key = a.name();

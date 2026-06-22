@@ -65,6 +65,8 @@ If the `s4c` alias is configured (see the project README), `s4c` can replace
 | `--metamodel` | Print the full M2 metamodel definition (all three sub-packages: core, architecture, security) and exit. No input files required |
 | `--inspect` | Print a full object-graph traversal: every rule with its fully resolved component objects, their types, attributes, ports, and children. Use this to verify the merge is correct before running a generator |
 | `--validate` | Run the merge and print the resolution report, but do not write any output file. Exit code is 0 if all references resolved, 1 if any are unresolved |
+| `--strict` | Treat semantic warnings (unmet or violated security rules, e.g. a single-replica `Availability=high`, a broken `Isolation`, an unauthenticated exposed service) as failures: exit non-zero and write no output. Use this to block insecure designs in CI |
+| `--serve [--port N]` | Start the web Studio (browser editor + live graph) on port N (default 8080) |
 | `--help` | Print usage |
 | `--version` | Print version |
 

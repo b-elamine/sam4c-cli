@@ -8,17 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Per-type editable-field schema, derived entirely from the M2 metamodel.
- *
- * For each concrete component type (and Connector), it lists the fields a user may edit,
- * with the kind of each (string | enum | bool | int | map | list) and any enum values.
- * The Studio renders its properties form generically from this, so adding a field to the
- * metamodel automatically makes it editable in the Studio -- no Studio code change.
- *
- * `type` is excluded (fixed by the palette choice). `ports`/`children`/`deployedOn` and the
- * free-form `attributes` are handled by the Studio's own structural sections, not here.
- */
+// Per-type editable fields for the Studio form, read straight from the metamodel:
+// each field's kind (string|enum|bool|int|map|list) plus any enum values. The form is
+// generated from this, so a new metamodel field shows up with no Studio change.
+// type/name are skipped; ports/children/deployedOn/attributes the Studio handles itself.
 public final class Schema {
 
     private Schema() {}

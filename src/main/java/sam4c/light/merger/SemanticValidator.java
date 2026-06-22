@@ -5,28 +5,21 @@ import sam4c.light.model.rule.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-/**
- * Semantic validation of the MERGED model.
- *
- * Where ConformanceChecker asks "is the model well-formed against M2?", this
- * asks "is the merged model meaningful?" -- it inspects the resolved rules and
- * coverage to find rules and contexts that resolve to nothing.
- *
- * These are warnings, not conformance errors: a rule covering no components is
- * structurally valid, but it governs nothing in this architecture. That is
- * either a mistake (forgot to tag a component, typo in a value) or an
- * unsatisfied requirement (a policy declared ahead of the architecture).
- */
+// Runs after merge. Produces warnings (not hard errors) about the resolved model:
+// rules/contexts that match nothing, and whether the design actually delivers what a
+// rule asks for. This is the security analysis layer; conformance only checks shape.
 public class SemanticValidator {
 
-    /** Returns a list of human-readable warnings. Empty list = clean. */
+    // empty list = nothing to flag
     public static List<String> validate(UnifiedModel model) {
         List<String> warnings = new ArrayList<>();
 
-        // 1. Rules that resolve to no components on a required argument
+        // rules whose arguments match no components (typo, missing tag, or unused policy)
         for (ResolvedRule rr : model.resolvedRules()) {
             String type = rr.rule().getClass().getSimpleName();
 
@@ -34,8 +27,7 @@ public class SemanticValidator {
                 warnings.add(type + ": sctx resolves to no components "
                         + "-- unused rule, or a missing/mistyped tag");
 
-            // tctx is optional on Confidentiality/Integrity/Isolation, required on
-            // Authentication. Only warn when tctx was actually specified in the rule.
+            // only complain about tctx when the rule actually has one
             if (tctxSpecified(rr.rule()) && rr.tctxComponents().isEmpty())
                 warnings.add(type + ": tctx was specified but resolves to no components");
 
@@ -43,17 +35,92 @@ public class SemanticValidator {
                 warnings.add(type + ": actx resolves to no components");
         }
 
-        // 2. Named contexts that match no components at all
+        // contexts that match nothing in this architecture
         for (Map.Entry<String, List<Component>> e : model.coverage().entrySet()) {
             if (e.getValue().isEmpty())
                 warnings.add("context '" + e.getKey() + "' matches no components "
                         + "-- predicate satisfied by nothing in the architecture");
         }
 
-        // 3. Availability satisfiability: a medium/high requirement must be backed by the
-        // architecture, or it is not actually delivered.
-        //   medium -> redundancy: >= 2 effective copies
-        //   high   -> redundancy AND spread across zones (survives a whole-zone outage)
+        // Isolation says "no path allowed", but merge found one -> violated
+        for (ResolvedRule rr : model.resolvedRules()) {
+            if (rr.rule() instanceof Isolation && !rr.paths().isEmpty())
+                warnings.add("Isolation violated: a network path exists via connector '"
+                        + rr.paths().get(0).connector() + "' between the two sides "
+                        + "-- they are not isolated");
+        }
+
+        // missing authentication: an internet-exposed workload with nothing guarding it
+        Set<String> authenticated = new HashSet<>();
+        for (ResolvedRule rr : model.resolvedRules())
+            if (rr.rule() instanceof Authentication)
+                rr.tctxComponents().forEach(c -> authenticated.add(c.name()));
+        List<Component> all = new ArrayList<>();
+        collect(model.architecture().components(), all);
+        for (Component c : all) {
+            if (isWorkload(c)
+                    && "external".equalsIgnoreCase(String.valueOf(c.properties().get("exposure")))
+                    && !authenticated.contains(c.name()))
+                warnings.add("'" + c.name() + "' is exposed (exposure: external) but no "
+                        + "Authentication rule guards it -- unauthenticated entry point");
+        }
+
+        // connectors marked external, and which components are wired to them
+        Set<String> externalConnectors = new HashSet<>();
+        for (Connector cn : model.architecture().connectors())
+            if (cn.external()) externalConnectors.add(cn.name());
+        Set<String> onExternal = new HashSet<>();
+        for (Link l : model.architecture().links()) {
+            if (!externalConnectors.contains(l.connectorName())) continue;
+            String ref = l.portRef();
+            onExternal.add(ref.contains(".") ? ref.substring(0, ref.indexOf('.')) : ref);
+        }
+
+        // a data store facing the external sphere (external exposure, or on an external connector)
+        for (Component c : all) {
+            if (!c.type().equals("Data")) continue;
+            if ("external".equalsIgnoreCase(String.valueOf(c.properties().get("exposure")))
+                    || onExternal.contains(c.name()))
+                warnings.add("Data store '" + c.name() + "' faces the external sphere "
+                        + "-- a stateful store should not be directly exposed");
+        }
+
+        // declared internal/none but wired to an external connector -> unintended exposure
+        for (Component c : all) {
+            if (!isWorkload(c)) continue;
+            String exp = String.valueOf(c.properties().get("exposure"));
+            if (!"external".equalsIgnoreCase(exp) && onExternal.contains(c.name()))
+                warnings.add("'" + c.name() + "' is declared exposure="
+                        + (c.properties().get("exposure") == null ? "none" : exp)
+                        + " but is wired to an external connector -- unintended exposure");
+        }
+
+        // Authorization granting access to a resource that no Authentication guards
+        for (ResolvedRule rr : model.resolvedRules()) {
+            if (!(rr.rule() instanceof Authorization)) continue;
+            for (Component res : rr.tctxComponents())
+                if (!authenticated.contains(res.name()))
+                    warnings.add("Authorization grants access to '" + res.name()
+                            + "' but no Authentication rule guards it -- access without authentication");
+        }
+
+        // Isolation and a communication rule over the same pair = contradictory policy
+        for (ResolvedRule iso : model.resolvedRules()) {
+            if (!(iso.rule() instanceof Isolation)) continue;
+            Set<String> a = names(iso.sctxComponents()), b = names(iso.tctxComponents());
+            if (a.isEmpty() || b.isEmpty()) continue;
+            for (ResolvedRule comm : model.resolvedRules()) {
+                if (comm == iso || !connects(comm.rule())) continue;
+                Set<String> cs = names(comm.sctxComponents()), ct = names(comm.tctxComponents());
+                if ((overlaps(a, cs) && overlaps(b, ct)) || (overlaps(a, ct) && overlaps(b, cs)))
+                    warnings.add("Isolation requires no path between two sides that "
+                            + comm.rule().getClass().getSimpleName()
+                            + " connects -- contradictory policy");
+            }
+        }
+
+        // Availability: medium needs >=2 copies, high also needs zone spread, or the
+        // requirement isn't really met.
         Map<String, Integer> replicas = effectiveReplicas(model.architecture());
         Map<String, String>  spread   = effectiveSpread(model.architecture());
         for (ResolvedRule rr : model.resolvedRules()) {
@@ -82,11 +149,28 @@ public class SemanticValidator {
         return c.type().equals("App") || c.type().equals("Data");
     }
 
-    /**
-     * Effective replica count per component name: a workload's own scale.replicas, or the
-     * replicas of its enclosing Colocation (scale attaches to the deployable unit, R-F5).
-     * Null = no scale declared anywhere (treated as a single copy by the caller).
-     */
+    // flatten the component tree into one list
+    private static void collect(List<Component> comps, List<Component> out) {
+        for (Component c : comps) { out.add(c); collect(c.children(), out); }
+    }
+
+    private static Set<String> names(List<Component> comps) {
+        Set<String> s = new HashSet<>();
+        for (Component c : comps) s.add(c.name());
+        return s;
+    }
+
+    private static boolean overlaps(Set<String> a, Set<String> b) {
+        for (String x : a) if (b.contains(x)) return true;
+        return false;
+    }
+
+    // a rule that implies the two sides communicate (so Isolation over the same pair conflicts)
+    private static boolean connects(SecurityRule r) {
+        return r instanceof Confidentiality || r instanceof Integrity || r instanceof Authentication;
+    }
+
+    // replicas per component: its own scale, else its enclosing Colocation's (null = none, so 1)
     private static Map<String, Integer> effectiveReplicas(Architecture arch) {
         Map<String, Integer> out = new HashMap<>();
         walkReplicas(arch.components(), null, out);
@@ -113,11 +197,7 @@ public class SemanticValidator {
         return null;
     }
 
-    /**
-     * Effective spread per component name: a workload's own `spread`, or that of its
-     * enclosing Colocation (the spread, like scale, attaches to the deployable unit).
-     * Null = none declared.
-     */
+    // spread per component: its own, else its enclosing Colocation's
     private static Map<String, String> effectiveSpread(Architecture arch) {
         Map<String, String> out = new HashMap<>();
         walkSpread(arch.components(), null, out);

@@ -73,7 +73,7 @@ public class ModelMerger {
                                              List<Component> all,
                                              Architecture arch,
                                              List<String> unresolved) {
-        // Resolve the three argument slots to component lists (actx only for Authentication)
+        // resolve each rule's argument slots to components (actx only for Authentication)
         List<Component> sctx = List.of(), tctx = List.of(), actx = List.of();
         switch (rule) {
             case Confidentiality r -> { sctx = resolveRef(r.sctx(), coverage, all, unresolved);
@@ -89,21 +89,13 @@ public class ModelMerger {
                                         tctx = resolveRef(r.resource(), coverage, all, unresolved); } // what
             case Availability r    -> { sctx = resolveRef(r.target(), coverage, all, unresolved); }   // single context, no path
         }
-        // Resolve the concrete connector paths between the source and target sides
         List<ResolvedPath> paths = resolvePaths(sctx, tctx, arch);
         return new ResolvedRule(rule, sctx, tctx, actx, paths);
     }
 
-    // -------------------------------------------------------------------------
-    // Path resolution: which connector(s) actually carry traffic between the
-    // rule's source side and target side.
-    //
-    // A path exists when an sctx component and a tctx component are both attached
-    // (via links) to the SAME connector. We record that connector plus the links
-    // (with direction) on each side. This is what a generator needs to place a
-    // control on the right channel.
-    // -------------------------------------------------------------------------
-
+    // Which connector(s) actually carry traffic between the two sides: a path exists when
+    // an sctx and a tctx component hang off the same connector. Records the connector and
+    // the links on each side, so a generator knows where to put a control.
     private static List<ResolvedPath> resolvePaths(List<Component> sctx,
                                                    List<Component> tctx,
                                                    Architecture arch) {

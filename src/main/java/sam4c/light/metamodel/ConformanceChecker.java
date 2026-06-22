@@ -7,16 +7,8 @@ import sam4c.light.model.rule.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Validates M1 model instances against the M2 Sam4cMetamodel.
- *
- * Every check here corresponds to a constraint declared in Sam4cMetamodel:
- * required attributes (lowerBound=1), required references (lowerBound=1),
- * multiplicity (lowerBound=2 on ComposedRef.conditions), and type validity.
- *
- * This is what EMF does automatically via its EValidator framework.
- * Here it is explicit so every rule is traceable to its M2 source.
- */
+// Checks a loaded model against the metamodel: required fields, multiplicities,
+// enum values and the structural invariants. Each check ties back to an M2 declaration.
 public class ConformanceChecker {
 
     private final MPackage metamodel;
@@ -339,11 +331,7 @@ public class ConformanceChecker {
         return s == null || s.isBlank();
     }
 
-    /**
-     * Validate an enum-valued property against the metamodel's `allowed` set for that
-     * type+attribute. The allowed values live only in the M2 declaration, so the loader,
-     * Studio form, serializer and this check never drift.
-     */
+    // check an enum value against the allowed set declared on that attribute in M2
     private static void checkEnum(List<String> errors, String ctx, String type, String attr, Object value) {
         if (value == null) return;
         List<String> allowed = Sam4cMetamodel.INSTANCE.allAttributes(type).stream()

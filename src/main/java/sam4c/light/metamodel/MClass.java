@@ -26,7 +26,7 @@ public record MClass(
         public Builder attr(String n, MDataType t, int lo, int hi) {
             attrs.add(new MAttribute(n, t, lo, hi)); return this;
         }
-        /** Declare a STRING field as an enum with a closed set of allowed values. */
+        // STRING field with a closed value set (enum)
         public Builder attr(String n, MDataType t, int lo, int hi, String... allowed) {
             attrs.add(new MAttribute(n, t, lo, hi, java.util.List.of(allowed))); return this;
         }

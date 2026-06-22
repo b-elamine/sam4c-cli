@@ -2,29 +2,10 @@ package sam4c.light.metamodel;
 
 import static sam4c.light.metamodel.MDataType.*;
 
-/**
- * Architecture sub-metamodel.
- * Defines every concept needed to describe a cloud application architecture.
- * Equivalent to the "architecture" subpackage in sam4c.ecore.
- *
- * Inheritance:
- *
- *   ContextualElement (from core)
- *     └── ElementApp (abstract)   -- base of all architecture elements
- *           ├── Component (abstract)
- *           │     ├── VM          -- virtual machine or grouping element
- *           │     ├── App         -- running application / microservice
- *           │     └── Data        -- data store
- *           ├── Connector         -- communication channel
- *           └── Port              -- connection point on a component
- *
- *   Architecture                  -- root container
- *   Link                          -- wires a port to a connector
- *
- * The key design choice: Component extends ContextualElement (inherited from
- * sam4c.ecore). This means any architecture element IS a valid context target
- * in security rules -- the bridge between the two metamodels.
- */
+// The architecture metamodel. Components are either App/Data (things that run),
+// VM/PM/Worker (hosts), or Zone/Colocation/HostPool (groups), wired together by
+// ports, connectors and links. Components are ContextualElements, which is how
+// security rules get to point at them.
 public final class ArchMetamodel {
 
     public static final MPackage INSTANCE = define();
@@ -47,9 +28,8 @@ public final class ArchMetamodel {
                 .ref("children", "Component", true, 0, -1)
                 .build(),
 
-            // Workload (abstract): something that RUNS. Carries deployment semantics.
-            // Every editable field is declared here -> the loader, conformance, Studio form,
-            // and serializer all derive from these declarations (single source of truth).
+            // Workload: anything that runs. All the deployment fields live here so App/Data
+            // inherit them, and the loader/conformance/Studio/writer all read these declarations.
             MClass.builder("Workload").abstractClass().superType("Component")
                 .attr("runtime",   STRING, 0, 1, "container", "process", "function")
                 .attr("exposure",  STRING, 0, 1, "none", "internal", "external")
@@ -73,15 +53,15 @@ public final class ArchMetamodel {
                 .attr("storage",    MAP,     0, 1)   // {size, class}
                 .build(),
 
-            // Host (abstract): something workloads RUN ON.
+            // Host: what workloads run on.
             MClass.builder("Host").abstractClass().superType("Component")
-                .attr("capacity", MAP, 0, 1)   // {cpu, memory}
+                .attr("capacity", MAP, 0, 1)
                 .build(),
             MClass.builder("VM")             .superType("Host").build(),
             MClass.builder("PM").superType("Host").build(),
             MClass.builder("Worker")    .superType("Host").build(),
 
-            // Group (abstract): CONTAINS components (via the children tree -> single parent).
+            // Group: contains other components through the children tree (one parent each).
             MClass.builder("Group").abstractClass().superType("Component").build(),
             MClass.builder("Zone").superType("Group")
                 .attr("boundary", STRING, 0, 1)        // logical/isolation boundary -> namespace/VPC
